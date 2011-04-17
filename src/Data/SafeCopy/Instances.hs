@@ -9,6 +9,7 @@ import Data.Binary
 import Data.Binary.Put
 import Data.Binary.Get
 import Control.Applicative
+import qualified Data.Array.IArray as IArray
 import qualified Data.Foldable as Foldable
 import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
@@ -65,6 +66,17 @@ instance (SafeCopy a) => SafeCopy (Sequence.Seq a) where
 instance (SafeCopy a) => SafeCopy (Tree.Tree a) where
     getCopy = contain $ liftM2 Tree.Tree safeGet safeGet
     putCopy (Tree.Tree root sub) = contain $ safePut root >> safePut sub
+
+
+instance (IArray.IArray a e, Ix i, SafeCopy e, SafeCopy i) => SafeCopy (a i e) where
+    getCopy = contain $ do getIx <- getSafeGet
+                           liftM3 mkArray getIx getIx safeGet
+        where
+          mkArray l h xs = IArray.listArray (l, h) xs
+    putCopy arr = contain $ do putIx <- getSafePut
+                               let (l,h) = IArray.bounds arr
+                               putIx l >> putIx h
+                               safePut (IArray.elems arr)
 
 
 instance (SafeCopy a, SafeCopy b) => SafeCopy (a,b) where
