@@ -8,6 +8,7 @@ import Data.Maybe
 import Data.Binary
 import Data.Binary.Put
 import Data.Binary.Get
+import Control.Applicative
 import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
 import qualified Data.Set as Set
@@ -62,6 +63,25 @@ instance (SafeCopy a, SafeCopy b, SafeCopy c, SafeCopy d) => SafeCopy (a,b,c,d) 
     kind = primitive
     getCopy = contain $ liftM4 (,,,) safeGet safeGet safeGet safeGet
     putCopy (a,b,c,d) = contain $ safePut a >> safePut b >> safePut c >> safePut d
+instance (SafeCopy a, SafeCopy b, SafeCopy c, SafeCopy d, SafeCopy e) =>
+         SafeCopy (a,b,c,d,e) where
+    kind = primitive
+    getCopy = contain $ liftM5 (,,,,) safeGet safeGet safeGet safeGet safeGet
+    putCopy (a,b,c,d,e) = contain $ safePut a >> safePut b >> safePut c >> safePut d >> safePut e
+instance (SafeCopy a, SafeCopy b, SafeCopy c, SafeCopy d, SafeCopy e, SafeCopy f) =>
+         SafeCopy (a,b,c,d,e,f) where
+    kind = primitive
+    getCopy = contain $ (,,,,,) <$> safeGet <*> safeGet <*> safeGet <*> safeGet <*> safeGet <*> safeGet
+    putCopy (a,b,c,d,e,f) = contain $ safePut a >> safePut b >> safePut c >> safePut d >>
+                                      safePut e >> safePut f
+instance (SafeCopy a, SafeCopy b, SafeCopy c, SafeCopy d, SafeCopy e, SafeCopy f, SafeCopy g) =>
+         SafeCopy (a,b,c,d,e,f,g) where
+    kind = primitive
+    getCopy = contain $ (,,,,,,) <$> safeGet <*> safeGet <*> safeGet <*> safeGet <*>
+                                     safeGet <*> safeGet <*> safeGet
+    putCopy (a,b,c,d,e,f,g) = contain $ safePut a >> safePut b >> safePut c >> safePut d >>
+                                        safePut e >> safePut f >> safePut g
+
 
 instance SafeCopy Int where
     kind = Primitive; getCopy = contain $ get; putCopy = contain . put
