@@ -9,9 +9,13 @@ import Data.Binary
 import Data.Binary.Put
 import Data.Binary.Get
 import Control.Applicative
+import qualified Data.Foldable as Foldable
 import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
+import qualified Data.IntSet as IntSet
+import qualified Data.Sequence as Sequence
 import qualified Data.Set as Set
+import qualified Data.Tree as Tree
 
 import qualified Data.ByteString.Lazy.Char8 as L
 import qualified Data.ByteString.Char8 as B
@@ -49,6 +53,18 @@ instance (SafeCopy a,SafeCopy b, Ord a) => SafeCopy (Map.Map a b) where
 instance (SafeCopy a) => SafeCopy (IntMap.IntMap a) where
     getCopy = contain $ fmap IntMap.fromDistinctAscList safeGet
     putCopy = contain . safePut . IntMap.toAscList
+
+instance (SafeCopy a) => SafeCopy (IntSet.IntSet a) where
+    getCopy = contain $ fmap IntSet.fromDistinctAscList safeGet
+    putCopy = contain . safePut . IntSet.toAscList
+
+instance (SafeCopy a) => SafeCopy (Sequence.Seq a) where
+    getCopy = contain $ fmap Sequence.fromList safeGet
+    putCopy = contain . safePut . Foldable.toList
+
+instance (SafeCopy a) => SafeCopy (Tree.Tree a) where
+    getCopy = contain $ liftM2 Tree.Tree safeGet safeGet
+    putCopy (Tree.Tree root sub) = contain $ safePut root >> safePut sub
 
 
 instance (SafeCopy a, SafeCopy b) => SafeCopy (a,b) where
