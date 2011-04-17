@@ -57,7 +57,7 @@ data Kind a where
 --   together with how it should be serialized/parsed.
 --
 --   Users should define instances of 'SafeCopy' for their types
---   even through 'getCopy' and 'putCopy' can't be used directly.
+--   even though 'getCopy' and 'putCopy' can't be used directly.
 --   To serialize/parse a data type using 'SafeCopy', see 'safeGet'
 --   and 'safePut'.
 class SafeCopy a where
