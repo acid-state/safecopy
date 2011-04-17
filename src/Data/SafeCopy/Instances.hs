@@ -39,15 +39,15 @@ instance SafeCopy a => SafeCopy (Maybe a) where
     putCopy Nothing = contain $ put False
 
 instance (SafeCopy a, Ord a) => SafeCopy (Set.Set a) where
-    getCopy = contain $ fmap Set.fromAscList safeGet
+    getCopy = contain $ fmap Set.fromDistinctAscList safeGet
     putCopy = contain . safePut . Set.toAscList
 
 instance (SafeCopy a,SafeCopy b, Ord a) => SafeCopy (Map.Map a b) where
-    getCopy = contain $ fmap Map.fromAscList safeGet
+    getCopy = contain $ fmap Map.fromDistinctAscList safeGet
     putCopy = contain . safePut . Map.toAscList
 
 instance (SafeCopy a) => SafeCopy (IntMap.IntMap a) where
-    getCopy = contain $ fmap IntMap.fromAscList safeGet
+    getCopy = contain $ fmap IntMap.fromDistinctAscList safeGet
     putCopy = contain . safePut . IntMap.toAscList
 
 
