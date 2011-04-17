@@ -185,7 +185,7 @@ instance Binary (Version a) where
 --   correct, it is necessary to restrict access to 'getCopy' and 'putCopy'.
 --   This is where 'Contained' enters the picture. It allows you to put
 --   values in to a container but not to take them out again.
-data Contained a = Contained {unsafeUnPack :: a}
+newtype Contained a = Contained {unsafeUnPack :: a}
 
 -- | Place a value in an unbreakable container.
 contain :: a -> Contained a
