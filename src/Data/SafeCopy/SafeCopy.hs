@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs, TypeFamilies, FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.SafeCopy.SafeCopy
@@ -111,14 +112,14 @@ safeGet
 -- | Parse a version tag and return the corresponding migrated parser. This is
 --   useful when you can prove that multiple values have the same version.
 --   See 'getSafePut'.
-getSafeGet :: SafeCopy a => Get (Get a)
+getSafeGet :: forall a. SafeCopy a => Get (Get a)
 getSafeGet
     = checkInvariants proxy $
       case kindFromProxy proxy of
         Primitive -> return $ unsafeUnPack getCopy
         _         -> do v <- get
                         return $ constructGetterFromVersion v proxy
-    where proxy = Proxy
+    where proxy = Proxy :: Proxy a
 
 -- | Serialize a data type by first writing out its version tag. This is much
 --   simpler than the corresponding 'safeGet' since previous versions don't
@@ -130,14 +131,14 @@ safePut a
 
 -- | Serialize the version tag and return the associated putter. This is useful
 --   when serializing multiple values with the same version. See 'getSafeGet'.
-getSafePut :: SafeCopy a => PutM (a -> Put)
+getSafePut :: forall a. SafeCopy a => PutM (a -> Put)
 getSafePut
     = checkInvariants proxy $
       case kindFromProxy proxy of
         Primitive -> return $ \a -> unsafeUnPack (putCopy $ asProxyType a proxy)
         _         -> do put (versionFromProxy proxy)
                         return $ \a -> unsafeUnPack (putCopy $ asProxyType a proxy)
-    where proxy = Proxy
+    where proxy = Proxy :: Proxy a
 
 -- | The extension kind lets the system know that there is
 --   at least one previous version of this type. A given data type
