@@ -8,7 +8,7 @@
 --
 -- SafeCopy extends the parsing and serialization capabilities of Data.Binary
 -- to include nested version control. Nested version control means that you
--- can change the defintion and binary format of a type nested deep within
+-- can change the definition and binary format of a type nested deep within
 -- other types without problems.
 --
 -- Consider this scenario. You want to store your contact list on disk
@@ -24,7 +24,7 @@
 -- @
 --
 -- At this point, everything is fine. You get the awesome speed of Data.Binary
--- together with Haskell's easy of use. However, things quickly takes a turn for the worse
+-- together with Haskell's ease of use. However, things quickly take a U-turn for the worse
 -- when you realize that you want to keep phone numbers as well as names and
 -- addresses. Being the experienced coder that you are, you see that using a 3-tuple
 -- isn't very pretty and you'd rather use a record. At first you fear that this
