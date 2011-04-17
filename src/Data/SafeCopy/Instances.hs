@@ -9,6 +9,9 @@ import Data.Binary
 import Data.Binary.Put
 import Data.Binary.Get
 import Control.Applicative
+import Data.Ix
+import qualified Data.Array as Array
+import qualified Data.Array.Unboxed as UArray
 import qualified Data.Array.IArray as IArray
 import qualified Data.Foldable as Foldable
 import qualified Data.Map as Map
@@ -55,7 +58,7 @@ instance (SafeCopy a) => SafeCopy (IntMap.IntMap a) where
     getCopy = contain $ fmap IntMap.fromDistinctAscList safeGet
     putCopy = contain . safePut . IntMap.toAscList
 
-instance (SafeCopy a) => SafeCopy (IntSet.IntSet a) where
+instance SafeCopy IntSet.IntSet where
     getCopy = contain $ fmap IntSet.fromDistinctAscList safeGet
     putCopy = contain . safePut . IntSet.toAscList
 
@@ -64,11 +67,10 @@ instance (SafeCopy a) => SafeCopy (Sequence.Seq a) where
     putCopy = contain . safePut . Foldable.toList
 
 instance (SafeCopy a) => SafeCopy (Tree.Tree a) where
-    getCopy = contain $ liftM2 Tree.Tree safeGet safeGet
-    putCopy (Tree.Tree root sub) = contain $ safePut root >> safePut sub
+    getCopy = contain $ liftM2 Tree.Node safeGet safeGet
+    putCopy (Tree.Node root sub) = contain $ safePut root >> safePut sub
 
-
-instance (IArray.IArray a e, Ix i, SafeCopy e, SafeCopy i) => SafeCopy (a i e) where
+instance (Ix i, SafeCopy e, SafeCopy i) => SafeCopy (Array.Array i e) where
     getCopy = contain $ do getIx <- getSafeGet
                            liftM3 mkArray getIx getIx safeGet
         where
