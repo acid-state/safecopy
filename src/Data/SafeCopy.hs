@@ -80,8 +80,12 @@ module Data.SafeCopy
     , Contained
     , contain
     , Version
-      -- * Rarely used functions
+
+      -- * Template haskell functions
     , deriveSafeCopy
+    , deriveSafeCopySimple
+
+      -- * Rarely used functions
     , getSafeGet
     , getSafePut
     , primitive

@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Data.SafeCopy.Derive (deriveSafeCopy) where
+module Data.SafeCopy.Derive (deriveSafeCopy, deriveSafeCopySimple) where
 
 import Data.Binary (getWord8, putWord8)
 import Data.SafeCopy.SafeCopy
@@ -16,7 +16,15 @@ instance (SafeCopy keys) => SafeCopy (name keys) where
     getCopy = contain $ ...
 -}
 deriveSafeCopy :: Integer -> Name -> Name -> Q [Dec]
-deriveSafeCopy versionId kindName tyName
+deriveSafeCopy = internalDeriveSafeCopy Normal
+
+deriveSafeCopySimple :: Integer -> Name -> Name -> Q [Dec]
+deriveSafeCopySimple = internalDeriveSafeCopy Simple
+
+data DeriveType = Normal | Simple
+
+internalDeriveSafeCopy :: DeriveType -> Integer -> Name -> Name -> Q [Dec]
+internalDeriveSafeCopy deriveType versionId kindName tyName
     = do info <- reify tyName
          case info of
            TyConI (DataD cxt _name tyvars cons _derivs)
@@ -30,19 +38,21 @@ deriveSafeCopy versionId kindName tyName
               = let ty = foldl appT (conT tyName) [ varT var | PlainTV var <- tyvars ]
                 in (:[]) <$> instanceD (cxt $ [classP ''SafeCopy [varT var] | PlainTV var <- tyvars] ++ map return context)
                                        (conT ''SafeCopy `appT` ty)
-                                       [ mkPutCopy cons
-                                       , mkGetCopy tyName cons
+                                       [ mkPutCopy deriveType cons
+                                       , mkGetCopy deriveType tyName cons
                                        , valD (varP 'version) (normalB (litE (integerL versionId))) []
                                        , valD (varP 'kind) (normalB (varE kindName)) []
                                        ]
 
-mkPutCopy :: [(Integer, Con)] -> DecQ
-mkPutCopy cons = funD 'putCopy $ map mkPutClause cons
+mkPutCopy :: DeriveType -> [(Integer, Con)] -> DecQ
+mkPutCopy deriveType cons = funD 'putCopy $ map mkPutClause cons
     where
       manyConstructors = length cons > 1
       mkPutClause (conNumber, con)
           = do putVars <- replicateM (conSize con) (newName "arg")
-               (putFunsDecs, putFuns) <- mkSafeFunctions "safePut_" 'getSafePut con
+               (putFunsDecs, putFuns) <- case deriveType of
+                                           Normal -> mkSafeFunctions "safePut_" 'getSafePut con
+                                           Simple -> return ([], const 'safePut)
                let putClause   = conP (conName con) (map varP putVars)
                    putCopyBody = varE 'contain `appE` doE (
                                    [ noBindS $ varE 'putWord8 `appE` (litE $ IntegerL conNumber) | manyConstructors ] ++
@@ -51,8 +61,8 @@ mkPutCopy cons = funD 'putCopy $ map mkPutClause cons
                                    [ noBindS $ varE 'return `appE` tupE [] ])
                clause [putClause] (normalB putCopyBody) []
 
-mkGetCopy :: Name -> [(Integer, Con)] -> DecQ
-mkGetCopy tyName cons = valD (varP 'getCopy) (normalB $ varE 'contain `appE` getCopyBody) []
+mkGetCopy :: DeriveType -> Name -> [(Integer, Con)] -> DecQ
+mkGetCopy deriveType tyName cons = valD (varP 'getCopy) (normalB $ varE 'contain `appE` getCopyBody) []
     where
       getCopyBody
           = case cons of
@@ -64,7 +74,9 @@ mkGetCopy tyName cons = valD (varP 'getCopy) (normalB $ varE 'contain `appE` get
                         [ match (litP $ IntegerL i) (normalB $ mkGetBody con) [] | (i, con) <- cons ] ++
                         [ match wildP (normalB $ varE 'fail `appE` errorMsg tagVar) [] ]) ]
       mkGetBody con
-          = do (getFunsDecs, getFuns) <- mkSafeFunctions "safeGet_" 'getSafeGet con
+          = do (getFunsDecs, getFuns) <- case deriveType of
+                                           Normal -> mkSafeFunctions "safeGet_" 'getSafeGet con
+                                           Simple -> return ([], const 'safeGet)
                let getBase = appE (varE 'return) (conE (conName con))
                    getArgs = foldl (\a t -> infixE (Just a) (varE '(<*>)) (Just (varE (getFuns t)))) getBase (conTypes con)
                doE (getFunsDecs ++ [noBindS getArgs])
