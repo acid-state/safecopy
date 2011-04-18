@@ -88,6 +88,22 @@ class SafeCopy a where
     --   One should use 'safeGet', instead.
     putCopy  :: a -> Contained Put
 
+    -- | Internal function that should not be overrided.
+    --   @Consistent True@ iff the version history is consistent
+    --   (i.e. there are no duplicate version numbers).
+    --
+    --   This function is in the typeclass so that this
+    --   information is calculated only once during the program
+    --   lifetime, instead of everytime 'safeGet' or 'safePut' is
+    --   used.
+    internalConsistent :: Consistent a
+    internalConsistent =
+        let ret = Consistent $ noDups $ availableVersions proxy
+            noDups xs = xs == nub xs
+            proxy = proxyFromConsistent ret
+        in ret
+
+
 
 constructGetterFromVersion :: SafeCopy a => Version a -> Proxy a -> Get a
 constructGetterFromVersion diskVersion a_proxy
@@ -194,6 +210,8 @@ contain = Contained
 -------------------------------------------------
 -- Consistency checking
 
+newtype Consistent a = Consistent {isConsistent :: Bool}
+
 availableVersions :: SafeCopy a => Proxy a -> [Int]
 availableVersions a_proxy
     = case kindFromProxy a_proxy of
@@ -203,14 +221,22 @@ availableVersions a_proxy
 
 checkInvariants :: (SafeCopy a, Monad m) => Proxy a -> m b -> m b
 checkInvariants proxy ks
-    = if versions == nub versions
-      then ks
-      else fail $ "Duplicate version tags: " ++ show versions
-    where versions = availableVersions proxy
+    = let consistent = internalConsistent `asTypeOf` consistentFromProxy proxy
+      in if isConsistent consistent
+         then ks
+         else let versions = availableVersions proxy
+              in fail $ "Duplicate version tags: " ++ show versions
+
 
 -------------------------------------------------
 -- Small utility functions that mean we don't
 -- have to depend on ScopedTypeVariables.
+
+proxyFromConsistent :: Consistent a -> Proxy a
+proxyFromConsistent _ = Proxy
+
+consistentFromProxy :: Proxy a -> Consistent a
+consistentFromProxy _ = Consistent (error "consistentFromProxy: never here")
 
 versionFromProxy :: SafeCopy a => Proxy a -> Version a
 versionFromProxy _ = version
