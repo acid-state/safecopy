@@ -223,17 +223,35 @@ mkGetCopy deriveType tyName cons = valD (varP 'getCopy) (normalB $ varE 'contain
                           , " constructors.  Maybe your data is corrupted?" ]
 
 mkSafeFunctions :: String -> Name -> Con -> Q ([StmtQ], Type -> Name)
-mkSafeFunctions name baseFun con = finish <$> foldM f ([], []) (conTypes con)
+mkSafeFunctions name baseFun con = do let origTypes = conTypes con
+                                      realTypes <- mapM followSynonyms origTypes
+                                      finish (zip origTypes realTypes) <$> foldM f ([], []) realTypes
     where f (ds, fs) t
-              | any ((== t) . fst) fs = return (ds, fs)
-              | otherwise             = do funVar <- newName (name ++ typeName t)
-                                           return ( bindS (varP funVar) (varE baseFun) : ds
-                                                  , (t, funVar) : fs )
-          finish (ds, fs) = (reverse ds, f)
-              where f typ = case lookup typ fs of
+              | found     = return (ds, fs)
+              | otherwise = do funVar <- newName (name ++ typeName t)
+                               return ( bindS (varP funVar) (varE baseFun) : ds
+                                      , (t, funVar) : fs )
+              where found = any ((== t) . fst) fs
+          finish typeList (ds, fs) = (reverse ds, f)
+              where f typ = case lookup typ typeList >>= flip lookup fs of
                               Just f  -> f
                               Nothing -> error "mkSafeFunctions: never here"
     -- We can't use a Data.Map because Type isn't a member of Ord =/...
+
+-- | Follow type synonyms.  This allows to see, for example, that
+--   @[Char]@ and @String@ are the same type and just need to
+--   call 'getSafePut' or 'getSafeGet' once for both.
+followSynonyms :: Type -> Q Type
+followSynonyms t@(ConT name)
+    = maybe (return t) followSynonyms =<<
+      recover (return Nothing) (do info <- reify name
+                                   return $ case info of
+                                              TyVarI _ ty            -> Just ty
+                                              TyConI (TySynD _ _ ty) -> Just ty
+                                              _                      -> Nothing)
+followSynonyms (AppT ty1 ty2) = liftM2 AppT (followSynonyms ty1) (followSynonyms ty2)
+followSynonyms (SigT ty kind) = liftM (flip SigT kind) (followSynonyms ty)
+followSynonyms t              = return t
 
 conSize :: Con -> Int
 conSize (NormalC _name args) = length args
