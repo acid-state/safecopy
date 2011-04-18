@@ -21,6 +21,7 @@ import Data.Binary.Get as B
 import qualified Data.ByteString.Lazy.Char8 as L
 import Control.Monad
 import Control.Applicative
+import Data.Int (Int32)
 import Data.List
 
 -- | The central mechanism for dealing with version control.
@@ -178,7 +179,7 @@ primitive = Primitive
 -- parser function.
 
 -- | A simple numeric version id.
-newtype Version a = Version {unVersion :: Int} deriving (Read,Show,Eq)
+newtype Version a = Version {unVersion :: Int32} deriving (Read,Show,Eq)
 
 castVersion :: Version a -> Version b
 castVersion (Version a) = Version a
@@ -215,7 +216,7 @@ contain = Contained
 
 data Consistency a = Consistent | NotConsistent String
 
-availableVersions :: SafeCopy a => Proxy a -> [Int]
+availableVersions :: SafeCopy a => Proxy a -> [Int32]
 availableVersions a_proxy
     = case kindFromProxy a_proxy of
         Primitive -> []
