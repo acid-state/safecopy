@@ -81,6 +81,7 @@ module Data.SafeCopy
     , contain
     , Version
       -- * Rarely used functions
+    , deriveSafeCopy
     , getSafeGet
     , getSafePut
     , primitive
@@ -89,3 +90,4 @@ module Data.SafeCopy
 
 import Data.SafeCopy.Instances
 import Data.SafeCopy.SafeCopy
+import Data.SafeCopy.Derive
