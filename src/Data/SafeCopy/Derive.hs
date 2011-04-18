@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Data.SafeCopy.Derive (deriveSafeCopy) where
 
-import Data.Binary (Get, getWord8, putWord8)
+import Data.Binary (getWord8, putWord8)
 import Data.SafeCopy.SafeCopy
 
 import Language.Haskell.TH hiding (Kind(..))
@@ -12,8 +12,8 @@ import Control.Monad
 instance (SafeCopy keys) => SafeCopy (name keys) where
     version = ?version?
     kind = ?kind?
-    putCopy (Con a b c) = contain $ do safePut a; safePut b; safePut c; return ()
-    getCopy = contain $ Con <$> safeGet <*> safeGet <*> safeGet
+    putCopy (Con a b c) = contain $ ...
+    getCopy = contain $ ...
 -}
 deriveSafeCopy :: Integer -> Name -> Name -> Q [Dec]
 deriveSafeCopy versionId kindName tyName
@@ -42,10 +42,12 @@ mkPutCopy cons = funD 'putCopy $ map mkPutClause cons
       manyConstructors = length cons > 1
       mkPutClause (conNumber, con)
           = do putVars <- replicateM (conSize con) (newName "arg")
+               (putFunsDecs, putFuns) <- mkSafeFunctions "safePut_" 'getSafePut con
                let putClause   = conP (conName con) (map varP putVars)
                    putCopyBody = varE 'contain `appE` doE (
                                    [ noBindS $ varE 'putWord8 `appE` (litE $ IntegerL conNumber) | manyConstructors ] ++
-                                   [ noBindS $ varE 'safePut `appE` varE var | var <- putVars ] ++
+                                   putFunsDecs ++
+                                   [ noBindS $ varE (putFuns typ) `appE` varE var | (typ, var) <- zip (conTypes con) putVars ] ++
                                    [ noBindS $ varE 'return `appE` tupE [] ])
                clause [putClause] (normalB putCopyBody) []
 
@@ -62,8 +64,10 @@ mkGetCopy tyName cons = valD (varP 'getCopy) (normalB $ varE 'contain `appE` get
                         [ match (litP $ IntegerL i) (normalB $ mkGetBody con) [] | (i, con) <- cons ] ++
                         [ match wildP (normalB $ varE 'fail `appE` errorMsg tagVar) [] ]) ]
       mkGetBody con
-          = let getBase = appE (varE 'return) (conE (conName con))
-            in foldl (\a b -> infixE (Just a) b (Just (varE 'safeGet))) getBase (replicate (conSize con) (varE '(<*>)))
+          = do (getFunsDecs, getFuns) <- mkSafeFunctions "safeGet_" 'getSafeGet con
+               let getBase = appE (varE 'return) (conE (conName con))
+                   getArgs = foldl (\a t -> infixE (Just a) (varE '(<*>)) (Just (varE (getFuns t)))) getBase (conTypes con)
+               doE (getFunsDecs ++ [noBindS getArgs])
       errorMsg tagVar = infixE (Just $ strE str1) (varE '(++)) $ Just $
                         infixE (Just tagStr) (varE '(++)) (Just $ strE str2)
           where
@@ -76,6 +80,19 @@ mkGetCopy tyName cons = valD (varP 'getCopy) (normalB $ varE 'contain `appE` get
                           , show (length cons)
                           , " constructors.  Maybe your data is corrupted?" ]
 
+mkSafeFunctions :: String -> Name -> Con -> Q ([StmtQ], Type -> Name)
+mkSafeFunctions name baseFun con = finish <$> foldM f ([], []) (conTypes con)
+    where f (ds, fs) t
+              | any ((== t) . fst) fs = return (ds, fs)
+              | otherwise             = do funVar <- newName (name ++ typeName t)
+                                           return ( bindS (varP funVar) (varE baseFun) : ds
+                                                  , (t, funVar) : fs )
+          finish (ds, fs) = (reverse ds, f)
+              where f typ = case lookup typ fs of
+                              Just f  -> f
+                              Nothing -> error "mkSafeFunctions: never here"
+    -- We can't use a Data.Map because Type isn't a member of Ord =/...
+
 conSize :: Con -> Int
 conSize (NormalC _name args) = length args
 conSize (RecC _name recs)    = length recs
@@ -87,4 +104,17 @@ conName (NormalC name _args) = name
 conName (RecC name _recs)    = name
 conName (InfixC _ name _)    = name
 
+conTypes :: Con -> [Type]
+conTypes (NormalC _name args)       = [t | (_, t)    <- args]
+conTypes (RecC _name args)          = [t | (_, _, t) <- args]
+conTypes (InfixC (_, t1) _ (_, t2)) = [t1, t2]
 
+typeName :: Type -> String
+typeName (VarT name) = nameBase name
+typeName (ConT name) = nameBase name
+typeName (TupleT n)  = "Tuple" ++ show n
+typeName ArrowT      = "Arrow"
+typeName ListT       = "List"
+typeName (AppT t u)  = typeName t ++ typeName u
+typeName (SigT t _k) = typeName t
+typeName _           = "_"
