@@ -27,23 +27,28 @@ deriveSafeCopy versionId kindName tyName
              -> worker cxt tyvars con
            _ -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info)
     where worker context tyvars con
-              = do putVars <- replicateM (conSize con) (newName "arg")
-                   let ty          = foldl appT (conT tyName) [ varT var | PlainTV var <- tyvars ]
-                       getArgs     = foldl (\a b -> infixE (Just a) b (Just (varE 'safeGet))) getBase (replicate (conSize con) (varE '(<*>)))
-                       getBase     = appE (varE 'return) (conE (conName con))
-                       getCopyBody = varE 'contain `appE` getArgs
-
-                       putClause   = conP (conName con) (map varP putVars)
-                       putCopyBody = varE 'contain `appE` doE ( [ noBindS $ varE 'safePut `appE` varE var | var <- putVars ] ++
-                                                                [ noBindS $ varE 'return `appE` tupE [] ])
+              = do putCopyDec <- mkPutCopy con
+                   getCopyDec <- mkGetCopy con
+                   let ty = foldl appT (conT tyName) [ varT var | PlainTV var <- tyvars ]
                    i <- instanceD (cxt $ [classP ''SafeCopy [varT var] | PlainTV var <- tyvars] ++ map return context)
                                   (conT ''SafeCopy `appT` ty)
-                                  [ funD 'putCopy [clause [putClause] (normalB putCopyBody) []]
-                                  , valD (varP 'getCopy) (normalB getCopyBody) []
+                                  [ putCopyDec
+                                  , getCopyDec
                                   , valD (varP 'version) (normalB (litE (integerL versionId))) []
                                   , valD (varP 'kind) (normalB (varE kindName)) []
                                   ]
                    return [i]
+          mkPutCopy con
+              = do putVars <- replicateM (conSize con) (newName "arg")
+                   let putClause   = conP (conName con) (map varP putVars)
+                       putCopyBody = varE 'contain `appE` doE ( [ noBindS $ varE 'safePut `appE` varE var | var <- putVars ] ++
+                                                                [ noBindS $ varE 'return `appE` tupE [] ])
+                   return $ funD 'putCopy [clause [putClause] (normalB putCopyBody) []]
+          mkGetCopy con
+              = do let getBase     = appE (varE 'return) (conE (conName con))
+                       getArgs     = foldl (\a b -> infixE (Just a) b (Just (varE 'safeGet))) getBase (replicate (conSize con) (varE '(<*>)))
+                       getCopyBody = varE 'contain `appE` getArgs
+                   return $ valD (varP 'getCopy) (normalB getCopyBody) []
           conSize (NormalC _name args) = length args
           conSize (RecC _name recs) = length recs
           conSize InfixC{} = 2
