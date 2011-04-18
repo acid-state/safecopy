@@ -23,7 +23,6 @@ import Control.Monad
 import Control.Applicative
 import Data.List
 
-
 -- | The central mechanism for dealing with version control.
 --
 --   This type class specifies what data migrations can happen
@@ -89,18 +88,18 @@ class SafeCopy a where
     putCopy  :: a -> Contained Put
 
     -- | Internal function that should not be overrided.
-    --   @Consistent True@ iff the version history is consistent
-    --   (i.e. there are no duplicate version numbers).
+    --   @Consistent@ iff the version history is consistent
+    --   (i.e. there are no duplicate version numbers) and
+    --   the chain of migrations is valid.
     --
     --   This function is in the typeclass so that this
     --   information is calculated only once during the program
     --   lifetime, instead of everytime 'safeGet' or 'safePut' is
     --   used.
-    internalConsistent :: Consistent a
-    internalConsistent =
-        let ret = Consistent $ noDups $ availableVersions proxy
-            noDups xs = xs == nub xs
-            proxy = proxyFromConsistent ret
+    internalConsistency :: Consistency a
+    internalConsistency =
+        let ret = computeConsistency proxy
+            proxy = proxyFromConsistency ret
         in ret
 
 
@@ -130,7 +129,7 @@ safeGet
 --   See 'getSafePut'.
 getSafeGet :: forall a. SafeCopy a => Get (Get a)
 getSafeGet
-    = checkInvariants proxy $
+    = checkConsistency proxy $
       case kindFromProxy proxy of
         Primitive -> return $ unsafeUnPack getCopy
         _         -> do v <- get
@@ -149,7 +148,7 @@ safePut a
 --   when serializing multiple values with the same version. See 'getSafeGet'.
 getSafePut :: forall a. SafeCopy a => PutM (a -> Put)
 getSafePut
-    = checkInvariants proxy $
+    = checkConsistency proxy $
       case kindFromProxy proxy of
         Primitive -> return $ \a -> unsafeUnPack (putCopy $ asProxyType a proxy)
         _         -> do put (versionFromProxy proxy)
@@ -163,6 +162,10 @@ getSafePut
 --   between each step is handled automatically.
 extension :: (SafeCopy a, Migrate a) => Kind a
 extension = Extends Proxy
+
+-- | The default kind. Does not extend any type.
+base :: Kind a
+base = Base
 
 -- | Primitive kinds aren't version tagged. This kind is used for small or built-in
 --   types that won't change such as 'Int' or 'Bool'.
@@ -210,7 +213,7 @@ contain = Contained
 -------------------------------------------------
 -- Consistency checking
 
-newtype Consistent a = Consistent {isConsistent :: Bool}
+data Consistency a = Consistent | NotConsistent String
 
 availableVersions :: SafeCopy a => Proxy a -> [Int]
 availableVersions a_proxy
@@ -219,24 +222,58 @@ availableVersions a_proxy
         Base      -> [unVersion (versionFromProxy a_proxy)]
         Extends b_proxy ->unVersion (versionFromProxy a_proxy) : availableVersions b_proxy
 
-checkInvariants :: (SafeCopy a, Monad m) => Proxy a -> m b -> m b
-checkInvariants proxy ks
-    = let consistent = internalConsistent `asTypeOf` consistentFromProxy proxy
-      in if isConsistent consistent
-         then ks
-         else let versions = availableVersions proxy
-              in fail $ "Duplicate version tags: " ++ show versions
+-- Extend chains must end in a Base kind. Ending in a Primitive is an error.
+validChain :: SafeCopy a => Proxy a -> Bool
+validChain a_proxy
+    = case kindFromProxy a_proxy of
+        Primitive       -> True
+        Base            -> True
+        Extends b_proxy -> check b_proxy
+    where check :: SafeCopy b => Proxy b -> Bool
+          check b_proxy
+              = case kindFromProxy b_proxy of
+                  Primitive       -> False
+                  Base            -> True
+                  Extends c_proxy -> check c_proxy
 
+-- Verify that the SafeCopy instance is consistent.
+checkConsistency :: (SafeCopy a, Monad m) => Proxy a -> m b -> m b
+checkConsistency proxy ks
+    = case consistentFromProxy proxy of
+        NotConsistent msg -> fail msg
+        Consistent        -> ks
+
+{-# INLINE computeConsistency #-}
+computeConsistency :: SafeCopy a => Proxy a -> Consistency a
+computeConsistency proxy
+    -- Match a few common cases before falling through to the general case.
+    -- This allows use to generate nearly all consistencies at compile-time.
+    | isObviouslyConsistent (kindFromProxy proxy)
+    = Consistent
+    | versions /= nub versions
+    = NotConsistent $ "Duplicate version tags: " ++ show versions
+    | not (validChain proxy)
+    = NotConsistent $ "Primitive types cannot be extended as they have no version tag."
+    | otherwise
+    = Consistent
+    where versions = availableVersions proxy
+
+isObviouslyConsistent :: Kind a -> Bool
+isObviouslyConsistent kind
+    = case kind of
+        Primitive -> True
+        Base      -> True
+        _         -> False
 
 -------------------------------------------------
 -- Small utility functions that mean we don't
 -- have to depend on ScopedTypeVariables.
 
-proxyFromConsistent :: Consistent a -> Proxy a
-proxyFromConsistent _ = Proxy
+proxyFromConsistency :: Consistency a -> Proxy a
+proxyFromConsistency _ = Proxy
 
-consistentFromProxy :: Proxy a -> Consistent a
-consistentFromProxy _ = Consistent (error "consistentFromProxy: never here")
+consistentFromProxy :: SafeCopy a => Proxy a -> Consistency a
+consistentFromProxy _ = internalConsistency
 
 versionFromProxy :: SafeCopy a => Proxy a -> Version a
 versionFromProxy _ = version

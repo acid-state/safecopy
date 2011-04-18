@@ -26,8 +26,6 @@ import qualified Data.ByteString.Char8 as B
 
 import Control.Monad
 
-
-
 instance SafeCopy a => SafeCopy [a] where
     kind = primitive
     getCopy = contain $
@@ -114,9 +112,9 @@ instance (SafeCopy a, SafeCopy b, SafeCopy c, SafeCopy d, SafeCopy e, SafeCopy f
 
 
 instance SafeCopy Int where
-    kind = Primitive; getCopy = contain $ get; putCopy = contain . put
+    kind = primitive; getCopy = contain $ get; putCopy = contain . put
 instance SafeCopy Integer where
-    kind = Primitive; getCopy = contain $ get; putCopy = contain . put
+    kind = primitive; getCopy = contain $ get; putCopy = contain . put
 instance SafeCopy Float where
     kind = primitive; getCopy = contain $ get; putCopy = contain . put
 instance SafeCopy Double where

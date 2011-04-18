@@ -84,6 +84,7 @@ module Data.SafeCopy
     , getSafeGet
     , getSafePut
     , primitive
+    , base
     ) where
 
 import Data.SafeCopy.Instances
