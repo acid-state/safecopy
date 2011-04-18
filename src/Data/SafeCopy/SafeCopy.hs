@@ -158,7 +158,7 @@ getSafePut
 
 -- | The extension kind lets the system know that there is
 --   at least one previous version of this type. A given data type
---   can only extend a single other data type. However, it is 
+--   can only extend a single other data type. However, it is
 --   perfectly fine to build chains of extensions. The migrations
 --   between each step is handled automatically.
 extension :: (SafeCopy a, Migrate a) => Kind a

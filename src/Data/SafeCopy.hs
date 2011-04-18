@@ -42,7 +42,7 @@
 --instance SafeCopy Contacts_v0 where
 --     putCopy (Contacts_v0 list) = contain $ safePut list
 --     getCopy = contain $ Contacts_v0 \<$\> safeGet
--- 
+--
 --data Contact = Contact { name    :: Name
 --                        , address :: Address
 --                        , phone   :: Phone }
@@ -70,7 +70,7 @@
 -- your data and you know you can remove @Contacts_v0@ once you no longer wish to support
 -- that legacy format.
 module Data.SafeCopy
-    ( 
+    (
       safeGet
     , safePut
     , SafeCopy(version, kind, getCopy, putCopy)
