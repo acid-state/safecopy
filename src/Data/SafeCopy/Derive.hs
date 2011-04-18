@@ -82,7 +82,7 @@ import Data.Word (Word8) -- Haddock
 --                                         \"that has only 2 constructors.  \" ++
 --                                         \"Maybe your data is corrupted?\"
 --    version = 1
---    kind = base
+--    kind = extension
 --   @
 --
 --   Note that by using getSafePut, we saved 4 bytes in the case
@@ -238,9 +238,9 @@ mkSafeFunctions name baseFun con = do let origTypes = conTypes con
                               Nothing -> error "mkSafeFunctions: never here"
     -- We can't use a Data.Map because Type isn't a member of Ord =/...
 
--- | Follow type synonyms.  This allows to see, for example, that
---   @[Char]@ and @String@ are the same type and just need to
---   call 'getSafePut' or 'getSafeGet' once for both.
+-- | Follow type synonyms.  This allows us to see, for example,
+-- that @[Char]@ and @String@ are the same type and we just need
+-- to call 'getSafePut' or 'getSafeGet' once for both.
 followSynonyms :: Type -> Q Type
 followSynonyms t@(ConT name)
     = maybe (return t) followSynonyms =<<
