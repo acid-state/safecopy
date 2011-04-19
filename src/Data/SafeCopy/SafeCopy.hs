@@ -108,7 +108,7 @@ constructGetterFromVersion :: SafeCopy a => Version a -> Proxy a -> Get a
 constructGetterFromVersion diskVersion a_proxy
     | version == diskVersion = unsafeUnPack getCopy
     | otherwise              = case kindFromProxy a_proxy of
-                                 Primitive -> fail $ "Cannot migrate from primitive types."
+                                 Primitive -> fail "Cannot migrate from primitive types."
                                  Base      -> fail $ "Cannot find getter associated with this version number: " ++ show diskVersion
                                  Extends b_proxy
                                    -> fmap migrate (constructGetterFromVersion (castVersion diskVersion) b_proxy)
@@ -253,7 +253,7 @@ computeConsistency proxy
     | versions /= nub versions
     = NotConsistent $ "Duplicate version tags: " ++ show versions
     | not (validChain proxy)
-    = NotConsistent $ "Primitive types cannot be extended as they have no version tag."
+    = NotConsistent "Primitive types cannot be extended as they have no version tag."
     | otherwise
     = Consistent
     where versions = availableVersions proxy

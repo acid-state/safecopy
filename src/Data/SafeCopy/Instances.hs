@@ -127,41 +127,41 @@ instance (SafeCopy a, SafeCopy b, SafeCopy c, SafeCopy d, SafeCopy e, SafeCopy f
 
 
 instance SafeCopy Int where
-    kind = primitive; getCopy = contain $ get; putCopy = contain . put
+    kind = primitive; getCopy = contain get; putCopy = contain . put
 instance SafeCopy Integer where
-    kind = primitive; getCopy = contain $ get; putCopy = contain . put
+    kind = primitive; getCopy = contain get; putCopy = contain . put
 instance SafeCopy Float where
-    kind = primitive; getCopy = contain $ get; putCopy = contain . put
+    kind = primitive; getCopy = contain get; putCopy = contain . put
 instance SafeCopy Double where
-    kind = primitive; getCopy = contain $ get; putCopy = contain . put
+    kind = primitive; getCopy = contain get; putCopy = contain . put
 instance SafeCopy L.ByteString where
-    kind = primitive; getCopy = contain $ get; putCopy = contain . put
+    kind = primitive; getCopy = contain get; putCopy = contain . put
 instance SafeCopy B.ByteString where
-    kind = primitive; getCopy = contain $ get; putCopy = contain . put
+    kind = primitive; getCopy = contain get; putCopy = contain . put
 instance SafeCopy Char where
-    kind = primitive; getCopy = contain $ get; putCopy = contain . put
+    kind = primitive; getCopy = contain get; putCopy = contain . put
 instance SafeCopy Word8 where
-    kind = primitive; getCopy = contain $ get; putCopy = contain . put
+    kind = primitive; getCopy = contain get; putCopy = contain . put
 instance SafeCopy Word16 where
-    kind = primitive; getCopy = contain $ get; putCopy = contain . put
+    kind = primitive; getCopy = contain get; putCopy = contain . put
 instance SafeCopy Word32 where
-    kind = primitive; getCopy = contain $ get; putCopy = contain . put
+    kind = primitive; getCopy = contain get; putCopy = contain . put
 instance SafeCopy Word64 where
-    kind = primitive; getCopy = contain $ get; putCopy = contain . put
+    kind = primitive; getCopy = contain get; putCopy = contain . put
 instance SafeCopy Ordering where
-    kind = primitive; getCopy = contain $ get; putCopy = contain . put
+    kind = primitive; getCopy = contain get; putCopy = contain . put
 instance SafeCopy Int8 where
-    kind = primitive; getCopy = contain $ get; putCopy = contain . put
+    kind = primitive; getCopy = contain get; putCopy = contain . put
 instance SafeCopy Int16 where
-    kind = primitive; getCopy = contain $ get; putCopy = contain . put
+    kind = primitive; getCopy = contain get; putCopy = contain . put
 instance SafeCopy Int32 where
-    kind = primitive; getCopy = contain $ get; putCopy = contain . put
+    kind = primitive; getCopy = contain get; putCopy = contain . put
 instance SafeCopy Int64 where
-    kind = primitive; getCopy = contain $ get; putCopy = contain . put
+    kind = primitive; getCopy = contain get; putCopy = contain . put
 instance SafeCopy () where
-    kind = primitive; getCopy = contain $ get; putCopy = contain . put
+    kind = primitive; getCopy = contain get; putCopy = contain . put
 instance SafeCopy Bool where
-    kind = primitive; getCopy = contain $ get; putCopy = contain . put
+    kind = primitive; getCopy = contain get; putCopy = contain . put
 instance (SafeCopy a, SafeCopy b) => SafeCopy (Either a b) where
     kind = primitive
     getCopy = contain $ do n <- get

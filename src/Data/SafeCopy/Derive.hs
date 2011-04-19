@@ -12,6 +12,7 @@ import Data.SafeCopy.SafeCopy
 import Language.Haskell.TH hiding (Kind(..))
 import Control.Applicative
 import Control.Monad
+import Data.Maybe (fromMaybe)
 import Data.Word (Word8) -- Haddock
 
 -- | Derive an instance of 'SafeCopy'.
@@ -239,7 +240,7 @@ mkPutCopy deriveType cons = funD 'putCopy $ map mkPutClause cons
                                            _      -> return ([], const 'safePut)
                let putClause   = conP (conName con) (map varP putVars)
                    putCopyBody = varE 'contain `appE` doE (
-                                   [ noBindS $ varE 'putWord8 `appE` (litE $ IntegerL conNumber) | manyConstructors ] ++
+                                   [ noBindS $ varE 'putWord8 `appE` litE (IntegerL conNumber) | manyConstructors ] ++
                                    putFunsDecs ++
                                    [ noBindS $ varE (putFuns typ) `appE` varE var | (typ, var) <- zip (conTypes con) putVars ] ++
                                    [ noBindS $ varE 'return `appE` tupE [] ])
@@ -287,9 +288,8 @@ mkSafeFunctions name baseFun con = do let origTypes = conTypes con
                                       , (t, funVar) : fs )
               where found = any ((== t) . fst) fs
           finish typeList (ds, fs) = (reverse ds, getName)
-              where getName typ = case lookup typ typeList >>= flip lookup fs of
-                                    Just f  -> f
-                                    Nothing -> error "mkSafeFunctions: never here"
+              where getName typ = fromMaybe err $ lookup typ typeList >>= flip lookup fs
+                    err = error "mkSafeFunctions: never here"
     -- We can't use a Data.Map because Type isn't a member of Ord =/...
 
 -- | Follow type synonyms.  This allows us to see, for example,
