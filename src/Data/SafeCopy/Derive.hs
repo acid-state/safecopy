@@ -99,7 +99,7 @@ import Data.Word (Word8) -- Haddock
 --   Note that you may use 'deriveSafeCopySimple' with one
 --   version of your data type and 'deriveSafeCopy' in another
 --   version without any problems.
-deriveSafeCopy :: Integer -> Name -> Name -> Q [Dec]
+deriveSafeCopy :: Version a -> Name -> Name -> Q [Dec]
 deriveSafeCopy = internalDeriveSafeCopy Normal
 
 -- | Derive an instance of 'SafeCopy'.  The instance derived by
@@ -151,7 +151,7 @@ deriveSafeCopy = internalDeriveSafeCopy Normal
 --   Note that you may use 'deriveSafeCopy' with one version of
 --   your data type and 'deriveSafeCopySimple' in another version
 --   without any problems.
-deriveSafeCopySimple :: Integer -> Name -> Name -> Q [Dec]
+deriveSafeCopySimple :: Version a -> Name -> Name -> Q [Dec]
 deriveSafeCopySimple = internalDeriveSafeCopy Simple
 
 -- | Derive an instance of 'SafeCopy'.  The instance derived by
@@ -198,7 +198,7 @@ deriveSafeCopySimple = internalDeriveSafeCopy Simple
 --   Note that you may use 'deriveSafeCopy' with one version of
 --   your data type and 'deriveSafeCopyHappstackData' in another version
 --   without any problems.
-deriveSafeCopyHappstackData :: Integer -> Name -> Name -> Q [Dec]
+deriveSafeCopyHappstackData :: Version a -> Name -> Name -> Q [Dec]
 deriveSafeCopyHappstackData = internalDeriveSafeCopy HappstackData
 
 data DeriveType = Normal | Simple | HappstackData
@@ -207,7 +207,7 @@ forceTag :: DeriveType -> Bool
 forceTag HappstackData = True
 forceTag _             = False
 
-internalDeriveSafeCopy :: DeriveType -> Integer -> Name -> Name -> Q [Dec]
+internalDeriveSafeCopy :: DeriveType -> Version a -> Name -> Name -> Q [Dec]
 internalDeriveSafeCopy deriveType versionId kindName tyName
     = do info <- reify tyName
          case info of
@@ -224,7 +224,7 @@ internalDeriveSafeCopy deriveType versionId kindName tyName
                                        (conT ''SafeCopy `appT` ty)
                                        [ mkPutCopy deriveType cons
                                        , mkGetCopy deriveType tyName cons
-                                       , valD (varP 'version) (normalB (litE (integerL versionId))) []
+                                       , valD (varP 'version) (normalB $ litE $ integerL $ fromIntegral $ unVersion versionId) []
                                        , valD (varP 'kind) (normalB (varE kindName)) []
                                        ]
 
