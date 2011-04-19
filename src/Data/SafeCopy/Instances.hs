@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Data.SafeCopy.Instances where
 
 import Data.SafeCopy.SafeCopy
@@ -68,15 +69,28 @@ instance (SafeCopy a) => SafeCopy (Tree.Tree a) where
     getCopy = contain $ liftM2 Tree.Node safeGet safeGet
     putCopy (Tree.Node root sub) = contain $ safePut root >> safePut sub
 
+
+iarray_getCopy :: (Ix i, SafeCopy e, SafeCopy i, IArray.IArray a e) => Contained (Get (a i e))
+iarray_getCopy = contain $ do getIx <- getSafeGet
+                              liftM3 mkArray getIx getIx safeGet
+    where
+      mkArray l h xs = IArray.listArray (l, h) xs
+{-# INLINE iarray_getCopy #-}
+
+iarray_putCopy :: (Ix i, SafeCopy e, SafeCopy i, IArray.IArray a e) => a i e -> Contained Put
+iarray_putCopy arr = contain $ do putIx <- getSafePut
+                                  let (l,h) = IArray.bounds arr
+                                  putIx l >> putIx h
+                                  safePut (IArray.elems arr)
+{-# INLINE iarray_putCopy #-}
+
 instance (Ix i, SafeCopy e, SafeCopy i) => SafeCopy (Array.Array i e) where
-    getCopy = contain $ do getIx <- getSafeGet
-                           liftM3 mkArray getIx getIx safeGet
-        where
-          mkArray l h xs = IArray.listArray (l, h) xs
-    putCopy arr = contain $ do putIx <- getSafePut
-                               let (l,h) = IArray.bounds arr
-                               putIx l >> putIx h
-                               safePut (IArray.elems arr)
+    getCopy = iarray_getCopy
+    putCopy = iarray_putCopy
+
+instance (IArray.IArray UArray.UArray e, Ix i, SafeCopy e, SafeCopy i) => SafeCopy (UArray.UArray i e) where
+    getCopy = iarray_getCopy
+    putCopy = iarray_putCopy
 
 
 instance (SafeCopy a, SafeCopy b) => SafeCopy (a,b) where
