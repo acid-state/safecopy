@@ -29,7 +29,7 @@ import Data.Word (Word8) -- Haddock
 --
 --   @
 --instance (SafeCopy a, SafeCopy b) =>
---         SafeCopy (T a b) where
+--         SafeCopy (T0 b) where
 --    putCopy (T0 arg1 arg2) = contain $ do put_b   <- getSafePut
 --                                          put_Int <- getSafePut
 --                                          put_b   arg1
@@ -46,8 +46,7 @@ import Data.Word (Word8) -- Haddock
 --
 --   @
 --data T a b = C a a | D b Int
---
---deriveSafeCopy 1 'extension ''T
+--deriveSafeCopy 2 'extension ''T
 --
 --instance SafeCopy b => Migrate (T a b) where
 --  type MigrateFrom (T a b) = T0 b
@@ -81,7 +80,7 @@ import Data.Word (Word8) -- Haddock
 --                                         show tag ++ \"\\\" for type Main.T \" ++
 --                                         \"that has only 2 constructors.  \" ++
 --                                         \"Maybe your data is corrupted?\"
---    version = 1
+--    version = 2
 --    kind = extension
 --   @
 --
@@ -111,7 +110,6 @@ deriveSafeCopy = internalDeriveSafeCopy Normal
 --
 --   @
 --data T a b = C a a | D b Int
---
 --deriveSafeCopySimple 1 'base ''T
 --   @
 --
