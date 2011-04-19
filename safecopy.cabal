@@ -29,7 +29,7 @@ Author:              David Himmelstrup, Felipe Lessa
 Maintainer:          Lemmih <lemmih@gmail.com>
 
 -- A copyright notice.
--- Copyright:           
+-- Copyright:
 
 Category:            Data, Parsing
 
@@ -37,7 +37,7 @@ Build-type:          Simple
 
 -- Extra files to be distributed with the package, such as examples or
 -- a README.
--- Extra-source-files:  
+-- Extra-source-files:
 
 -- Constraint on the version of Cabal needed to build this package.
 Cabal-version:       >=1.6
@@ -48,7 +48,7 @@ Library
   Exposed-modules:     Data.SafeCopy
 
   Hs-Source-Dirs:      src/
-  
+
   -- Packages needed in order to build this package.
   Build-depends:       base >=4 && <5, array, cereal >= 0.3.1.0, bytestring, containers >= 0.3,
                        template-haskell
@@ -56,7 +56,8 @@ Library
   -- Modules not exported by this package.
   Other-modules:       Data.SafeCopy.Instances, Data.SafeCopy.SafeCopy,
                        Data.SafeCopy.Derive
-  
+
   -- Extra tools (e.g. alex, hsc2hs, ...) needed to build the source.
-  -- Build-tools:         
-  
+  -- Build-tools:
+
+  GHC-Options:         -Wall
