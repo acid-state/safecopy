@@ -1,5 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Data.SafeCopy.Derive (deriveSafeCopy, deriveSafeCopySimple) where
+module Data.SafeCopy.Derive
+    (
+      deriveSafeCopy
+    , deriveSafeCopySimple
+    , deriveSafeCopyHappstackData
+    ) where
 
 import Data.Binary (getWord8, putWord8)
 import Data.SafeCopy.SafeCopy
@@ -149,7 +154,58 @@ deriveSafeCopy = internalDeriveSafeCopy Normal
 deriveSafeCopySimple :: Integer -> Name -> Name -> Q [Dec]
 deriveSafeCopySimple = internalDeriveSafeCopy Simple
 
-data DeriveType = Normal | Simple
+-- | Derive an instance of 'SafeCopy'.  The instance derived by
+--   this function should be compatible with the instance derived
+--   by the module @Happstack.Data.SerializeTH@ of the
+--   @happstack-data@ package.  The instances use only 'safePut'
+--   and 'safeGet' (as do the instances created by
+--   'deriveSafeCopySimple'), but we also always write a 'Word8'
+--   tag, even if the data type isn't a sum type.
+--
+--   For example, given the data type and the declaration below
+--
+--   @
+--data T0 b = T0 b Int
+--deriveSafeCopy 1 'base ''T0
+--   @
+--
+--   we generate
+--
+--   @
+--instance (SafeCopy a, SafeCopy b) =>
+--         SafeCopy (T0 b) where
+--    putCopy (T0 arg1 arg2) = contain $ do putWord8 0
+--                                          safePut arg1
+--                                          safePut arg2
+--                                          return ()
+--    getCopy = contain $ do tag <- getWord8
+--                           case tag of
+--                             0 -> do return T0 \<*\> safeGet \<*\> safeGet
+--                             _ -> fail $ \"Could not identify tag \\\"\" ++
+--                                         show tag ++ \"\\\" for type Main.T0 \" ++
+--                                         \"that has only 1 constructors.  \" ++
+--                                         \"Maybe your data is corrupted?\"
+--    version = 1
+--    kind = base
+--   @
+--
+--   This instance always consumes at least the same space as
+--   'deriveSafeCopy' or 'deriveSafeCopySimple', but may use more
+--   because of the useless tag.  So we recomend using it only if
+--   you really need to read a previous version in this format,
+--   and not for newer versions.
+--
+--   Note that you may use 'deriveSafeCopy' with one version of
+--   your data type and 'deriveSafeCopyHappstackData' in another version
+--   without any problems.
+deriveSafeCopyHappstackData :: Integer -> Name -> Name -> Q [Dec]
+deriveSafeCopyHappstackData = internalDeriveSafeCopy HappstackData
+
+data DeriveType = Normal | Simple | HappstackData
+
+forceTag :: DeriveType -> Bool
+forceTag HappstackData = True
+forceTag _             = False
 
 internalDeriveSafeCopy :: DeriveType -> Integer -> Name -> Name -> Q [Dec]
 internalDeriveSafeCopy deriveType versionId kindName tyName
@@ -175,12 +231,12 @@ internalDeriveSafeCopy deriveType versionId kindName tyName
 mkPutCopy :: DeriveType -> [(Integer, Con)] -> DecQ
 mkPutCopy deriveType cons = funD 'putCopy $ map mkPutClause cons
     where
-      manyConstructors = length cons > 1
+      manyConstructors = length cons > 1 || forceTag deriveType
       mkPutClause (conNumber, con)
           = do putVars <- replicateM (conSize con) (newName "arg")
                (putFunsDecs, putFuns) <- case deriveType of
                                            Normal -> mkSafeFunctions "safePut_" 'getSafePut con
-                                           Simple -> return ([], const 'safePut)
+                                           _      -> return ([], const 'safePut)
                let putClause   = conP (conName con) (map varP putVars)
                    putCopyBody = varE 'contain `appE` doE (
                                    [ noBindS $ varE 'putWord8 `appE` (litE $ IntegerL conNumber) | manyConstructors ] ++
@@ -194,8 +250,8 @@ mkGetCopy deriveType tyName cons = valD (varP 'getCopy) (normalB $ varE 'contain
     where
       getCopyBody
           = case cons of
-              [(_, con)] -> mkGetBody con
-              _          -> do
+              [(_, con)] | not (forceTag deriveType) -> mkGetBody con
+              _ -> do
                 tagVar <- newName "tag"
                 doE [ bindS (varP tagVar) (varE 'getWord8)
                     , noBindS $ caseE (varE tagVar) (
@@ -204,7 +260,7 @@ mkGetCopy deriveType tyName cons = valD (varP 'getCopy) (normalB $ varE 'contain
       mkGetBody con
           = do (getFunsDecs, getFuns) <- case deriveType of
                                            Normal -> mkSafeFunctions "safeGet_" 'getSafeGet con
-                                           Simple -> return ([], const 'safeGet)
+                                           _      -> return ([], const 'safeGet)
                let getBase = appE (varE 'return) (conE (conName con))
                    getArgs = foldl (\a t -> infixE (Just a) (varE '(<*>)) (Just (varE (getFuns t)))) getBase (conTypes con)
                doE (getFunsDecs ++ [noBindS getArgs])

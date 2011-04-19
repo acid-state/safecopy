@@ -84,6 +84,7 @@ module Data.SafeCopy
       -- * Template haskell functions
     , deriveSafeCopy
     , deriveSafeCopySimple
+    , deriveSafeCopyHappstackData
 
       -- * Rarely used functions
     , getSafeGet
