@@ -1,5 +1,4 @@
 {-# LANGUAGE FlexibleContexts #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Data.SafeCopy.Instances where
 
 import Data.SafeCopy.SafeCopy
@@ -7,9 +6,9 @@ import Data.SafeCopy.SafeCopy
 import Data.Word
 import Data.Int
 import Data.Maybe
-import Data.Binary
-import Data.Binary.Put
-import Data.Binary.Get
+import Data.Serialize
+import Data.Serialize.Put
+import Data.Serialize.Get
 import Control.Applicative
 import Data.Ix
 import qualified Data.Array as Array
@@ -50,7 +49,7 @@ instance (SafeCopy a, Ord a) => SafeCopy (Set.Set a) where
     getCopy = contain $ fmap Set.fromDistinctAscList safeGet
     putCopy = contain . safePut . Set.toAscList
 
-instance (SafeCopy a, SafeCopy b, Ord a) => SafeCopy (Map.Map a b) where
+instance (SafeCopy a,SafeCopy b, Ord a) => SafeCopy (Map.Map a b) where
     getCopy = contain $ fmap Map.fromDistinctAscList safeGet
     putCopy = contain . safePut . Map.toAscList
 

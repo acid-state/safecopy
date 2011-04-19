@@ -15,11 +15,12 @@
 --
 module Data.SafeCopy.SafeCopy where
 
-import Data.Binary as B
-import Data.Binary.Put as B
-import Data.Binary.Get as B
+import Data.Serialize as B
+import Data.Serialize.Put as B
+import Data.Serialize.Get as B
 import qualified Data.ByteString.Lazy.Char8 as L
 import Control.Monad
+import Control.Applicative
 import Data.Int (Int32)
 import Data.List
 
@@ -259,9 +260,11 @@ computeConsistency proxy
     where versions = availableVersions proxy
 
 isObviouslyConsistent :: Kind a -> Bool
-isObviouslyConsistent Primitive = True
-isObviouslyConsistent Base      = True
-isObviouslyConsistent _         = False
+isObviouslyConsistent kind
+    = case kind of
+        Primitive -> True
+        Base      -> True
+        _         -> False
 
 -------------------------------------------------
 -- Small utility functions that mean we don't

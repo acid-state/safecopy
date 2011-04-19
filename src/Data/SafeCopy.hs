@@ -93,6 +93,6 @@ module Data.SafeCopy
     , base
     ) where
 
-import Data.SafeCopy.Instances
+import Data.SafeCopy.Instances ()
 import Data.SafeCopy.SafeCopy
 import Data.SafeCopy.Derive

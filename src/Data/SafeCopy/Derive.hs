@@ -211,12 +211,12 @@ internalDeriveSafeCopy :: DeriveType -> Version a -> Name -> Name -> Q [Dec]
 internalDeriveSafeCopy deriveType versionId kindName tyName
     = do info <- reify tyName
          case info of
-           TyConI (DataD cxt _name tyvars cons _derivs)
+           TyConI (DataD context _name tyvars cons _derivs)
              | length cons > 255 -> fail $ "Can't derive SafeCopy instance for: " ++ show tyName ++
                                            ". The datatype must have less than 256 constructors."
-             | otherwise         -> worker cxt tyvars (zip [0..] cons)
-           TyConI (NewtypeD cxt _name tyvars con _derivs)
-             -> worker cxt tyvars [(0, con)]
+             | otherwise         -> worker context tyvars (zip [0..] cons)
+           TyConI (NewtypeD context _name tyvars con _derivs)
+             -> worker context tyvars [(0, con)]
            _ -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info)
     where worker context tyvars cons
               = let ty = foldl appT (conT tyName) [ varT var | PlainTV var <- tyvars ]
@@ -279,17 +279,17 @@ mkGetCopy deriveType tyName cons = valD (varP 'getCopy) (normalB $ varE 'contain
 mkSafeFunctions :: String -> Name -> Con -> Q ([StmtQ], Type -> Name)
 mkSafeFunctions name baseFun con = do let origTypes = conTypes con
                                       realTypes <- mapM followSynonyms origTypes
-                                      finish (zip origTypes realTypes) <$> foldM f ([], []) realTypes
-    where f (ds, fs) t
+                                      finish (zip origTypes realTypes) <$> foldM go ([], []) realTypes
+    where go (ds, fs) t
               | found     = return (ds, fs)
               | otherwise = do funVar <- newName (name ++ typeName t)
                                return ( bindS (varP funVar) (varE baseFun) : ds
                                       , (t, funVar) : fs )
               where found = any ((== t) . fst) fs
-          finish typeList (ds, fs) = (reverse ds, f)
-              where f typ = case lookup typ typeList >>= flip lookup fs of
-                              Just f  -> f
-                              Nothing -> error "mkSafeFunctions: never here"
+          finish typeList (ds, fs) = (reverse ds, getName)
+              where getName typ = case lookup typ typeList >>= flip lookup fs of
+                                    Just f  -> f
+                                    Nothing -> error "mkSafeFunctions: never here"
     -- We can't use a Data.Map because Type isn't a member of Ord =/...
 
 -- | Follow type synonyms.  This allows us to see, for example,
@@ -304,7 +304,7 @@ followSynonyms t@(ConT name)
                                               TyConI (TySynD _ _ ty) -> Just ty
                                               _                      -> Nothing)
 followSynonyms (AppT ty1 ty2) = liftM2 AppT (followSynonyms ty1) (followSynonyms ty2)
-followSynonyms (SigT ty kind) = liftM (flip SigT kind) (followSynonyms ty)
+followSynonyms (SigT ty k)    = liftM (flip SigT k) (followSynonyms ty)
 followSynonyms t              = return t
 
 conSize :: Con -> Int
@@ -317,11 +317,13 @@ conName :: Con -> Name
 conName (NormalC name _args) = name
 conName (RecC name _recs)    = name
 conName (InfixC _ name _)    = name
+conName _                    = error "conName: never here"
 
 conTypes :: Con -> [Type]
 conTypes (NormalC _name args)       = [t | (_, t)    <- args]
 conTypes (RecC _name args)          = [t | (_, _, t) <- args]
 conTypes (InfixC (_, t1) _ (_, t2)) = [t1, t2]
+conTypes _                          = error "conName: never here"
 
 typeName :: Type -> String
 typeName (VarT name) = nameBase name
