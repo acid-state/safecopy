@@ -15,9 +15,9 @@
 --
 module Data.SafeCopy.SafeCopy where
 
-import Data.Binary as B
-import Data.Binary.Put as B
-import Data.Binary.Get as B
+import Data.Serialize as B
+import Data.Serialize.Put as B
+import Data.Serialize.Get as B
 import qualified Data.ByteString.Lazy.Char8 as L
 import Control.Monad
 import Control.Applicative
@@ -193,7 +193,7 @@ instance Num (Version a) where
     signum (Version a) = Version (signum a)
     fromInteger i = Version (fromInteger i)
 
-instance Binary (Version a) where
+instance Serialize (Version a) where
     get = liftM Version get
     put = put . unVersion
 

@@ -5,9 +5,9 @@ import Data.SafeCopy.SafeCopy
 import Data.Word
 import Data.Int
 import Data.Maybe
-import Data.Binary
-import Data.Binary.Put
-import Data.Binary.Get
+import Data.Serialize
+import Data.Serialize.Put
+import Data.Serialize.Get
 import Control.Applicative
 import Data.Ix
 import qualified Data.Array as Array

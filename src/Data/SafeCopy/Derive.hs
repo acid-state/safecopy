@@ -6,7 +6,7 @@ module Data.SafeCopy.Derive
     , deriveSafeCopyHappstackData
     ) where
 
-import Data.Binary (getWord8, putWord8)
+import Data.Serialize (getWord8, putWord8)
 import Data.SafeCopy.SafeCopy
 
 import Language.Haskell.TH hiding (Kind(..))
