@@ -6,7 +6,7 @@
 -- Maintainer  :  lemmih@gmail.com
 -- Portability :  non-portable (uses GHC extensions)
 --
--- SafeCopy extends the parsing and serialization capabilities of Data.Binary
+-- SafeCopy extends the parsing and serialization capabilities of Data.Serialize
 -- to include nested version control. Nested version control means that you
 -- can change the definition and binary format of a type nested deep within
 -- other types without problems.
@@ -23,7 +23,7 @@
 --     getCopy = contain $ Contacts \<$\> safeGet
 -- @
 --
--- At this point, everything is fine. You get the awesome speed of Data.Binary
+-- At this point, everything is fine. You get the awesome speed of Data.Serialize
 -- together with Haskell's ease of use. However, things quickly take a U-turn for the worse
 -- when you realize that you want to keep phone numbers as well as names and
 -- addresses. Being the experienced coder that you are, you see that using a 3-tuple
