@@ -15,10 +15,8 @@
 --
 module Data.SafeCopy.SafeCopy where
 
-import Data.Binary as B
-import Data.Binary.Put as B
-import Data.Binary.Get as B
-import qualified Data.ByteString.Lazy.Char8 as L
+import Data.Serialize as B
+
 import Control.Monad
 import Data.Int (Int32)
 import Data.List
