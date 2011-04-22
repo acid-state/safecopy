@@ -15,7 +15,7 @@
 --
 module Data.SafeCopy.SafeCopy where
 
-import Data.Serialize as B
+import Data.Serialize
 
 import Control.Monad
 import Data.Int (Int32)
