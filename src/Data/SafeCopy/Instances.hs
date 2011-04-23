@@ -28,6 +28,7 @@ import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
 import           Data.Time.Calendar (Day(..))
 import           Data.Time.Clock (DiffTime, NominalDiffTime, UniversalTime(..), UTCTime(..))
+import           Data.Time.Clock.TAI (AbsoluteTime, taiEpoch, addAbsoluteTime, diffAbsoluteTime)
 import           Data.Time.LocalTime (LocalTime(..), TimeOfDay(..), TimeZone(..), ZonedTime(..))
 import qualified Data.Tree as Tree
 import           Data.Word
@@ -265,6 +266,16 @@ instance SafeCopy ZonedTime where
                              return (ZonedTime localTime timeZone)
     putCopy t = contain $ do safePut (zonedTimeToLocalTime t)
                              safePut (zonedTimeZone t)
+
+instance SafeCopy AbsoluteTime where
+  getCopy = contain $ liftM toAbsoluteTime safeGet
+    where
+      toAbsoluteTime :: DiffTime -> AbsoluteTime
+      toAbsoluteTime dt = addAbsoluteTime dt taiEpoch
+  putCopy = contain . safePut . fromAbsoluteTime
+    where
+      fromAbsoluteTime :: AbsoluteTime -> DiffTime
+      fromAbsoluteTime at = diffAbsoluteTime at taiEpoch
 
 -- instances for old-time
 
