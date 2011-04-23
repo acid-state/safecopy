@@ -4,35 +4,33 @@ module Data.SafeCopy.Instances where
 
 import Data.SafeCopy.SafeCopy
 
-import Data.Word
-import Data.Int
-import Data.Fixed (HasResolution, Fixed)
-import Data.Ratio (Ratio, (%), numerator, denominator)
-import Data.Serialize
+import           Control.Applicative
+import           Control.Monad
+import qualified Data.Array as Array
+import qualified Data.Array.Unboxed as UArray
+import qualified Data.Array.IArray as IArray
+import qualified Data.ByteString.Lazy.Char8 as L
+import qualified Data.ByteString.Char8 as B
+import qualified Data.Foldable as Foldable
+import           Data.Fixed (HasResolution, Fixed)
+import           Data.Int
+import qualified Data.IntMap as IntMap
+import qualified Data.IntSet as IntSet
+import           Data.Ix
+import qualified Data.Map as Map
+import           Data.Ratio (Ratio, (%), numerator, denominator)
+import qualified Data.Sequence as Sequence
+import           Data.Serialize
+import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
-import Data.Time.Calendar (Day(..))
-import Data.Time.Clock (DiffTime, NominalDiffTime, UniversalTime(..), UTCTime(..))
-import Data.Time.LocalTime (LocalTime(..), TimeOfDay(..), TimeZone(..), ZonedTime(..))
-import Control.Applicative
-import Data.Ix
-import qualified Data.Array as Array
-import qualified Data.Array.Unboxed as UArray
-import qualified Data.Array.IArray as IArray
-import qualified Data.Foldable as Foldable
-import qualified Data.Map as Map
-import qualified Data.IntMap as IntMap
-import qualified Data.IntSet as IntSet
-import qualified Data.Sequence as Sequence
-import qualified Data.Set as Set
+import           Data.Time.Calendar (Day(..))
+import           Data.Time.Clock (DiffTime, NominalDiffTime, UniversalTime(..), UTCTime(..))
+import           Data.Time.LocalTime (LocalTime(..), TimeOfDay(..), TimeZone(..), ZonedTime(..))
 import qualified Data.Tree as Tree
-
-import qualified Data.ByteString.Lazy.Char8 as L
-import qualified Data.ByteString.Char8 as B
-
-import Control.Monad
+import           Data.Word
 
 instance SafeCopy a => SafeCopy [a] where
     kind = primitive
