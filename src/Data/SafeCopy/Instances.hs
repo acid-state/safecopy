@@ -7,6 +7,10 @@ import Data.SafeCopy.SafeCopy
 import Data.Word
 import Data.Int
 import Data.Serialize
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.Encoding as TL
 import Control.Applicative
 import Data.Ix
 import qualified Data.Array as Array
@@ -167,4 +171,14 @@ instance (SafeCopy a, SafeCopy b) => SafeCopy (Either a b) where
     putCopy (Right a) = contain $ put True >> safePut a
     putCopy (Left a) = contain $ put False >> safePut a
 
+--  instances for 'text'
 
+instance SafeCopy T.Text where
+    kind = base
+    getCopy = contain $ T.decodeUtf8 <$> safeGet
+    putCopy = contain . safePut . T.encodeUtf8
+
+instance SafeCopy TL.Text where
+    kind = base
+    getCopy = contain $ TL.decodeUtf8 <$> safeGet
+    putCopy = contain . safePut . TL.encodeUtf8
