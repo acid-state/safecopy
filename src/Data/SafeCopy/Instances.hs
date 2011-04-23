@@ -31,6 +31,8 @@ import           Data.Time.Clock (DiffTime, NominalDiffTime, UniversalTime(..), 
 import           Data.Time.LocalTime (LocalTime(..), TimeOfDay(..), TimeZone(..), ZonedTime(..))
 import qualified Data.Tree as Tree
 import           Data.Word
+import           System.Time (ClockTime(..), TimeDiff(..), CalendarTime(..), Month(..))
+import qualified System.Time as OT
 
 instance SafeCopy a => SafeCopy [a] where
     kind = primitive
@@ -263,3 +265,67 @@ instance SafeCopy ZonedTime where
                              return (ZonedTime localTime timeZone)
     putCopy t = contain $ do safePut (zonedTimeToLocalTime t)
                              safePut (zonedTimeZone t)
+
+-- instances for old-time
+
+instance SafeCopy ClockTime where
+    kind = base
+    getCopy = contain $ do secs <- safeGet
+                           pico <- safeGet
+                           return (TOD secs pico)
+    putCopy (TOD secs pico) =
+              contain $ do safePut secs
+                           safePut pico
+
+instance SafeCopy TimeDiff where
+    kind = base
+    getCopy   = contain $ do year    <- get
+                             month   <- get
+                             day     <- get
+                             hour    <- get
+                             mins    <- get
+                             sec     <- get
+                             pico    <- get
+                             return (TimeDiff year month day hour mins sec pico)
+    putCopy t = contain $ do put (tdYear t)
+                             put (tdMonth t)
+                             put (tdDay t)
+                             put (tdHour t)
+                             put (tdMin t)
+                             put (tdSec t)
+                             put (tdPicosec t)
+
+instance SafeCopy OT.Day where
+    kind = base ; getCopy = contain $ toEnum <$> get ; putCopy = contain . put . fromEnum
+
+instance SafeCopy Month where
+    kind = base ; getCopy = contain $ toEnum <$> get ; putCopy = contain . put . fromEnum
+
+
+instance SafeCopy CalendarTime where
+    kind = base
+    getCopy   = contain $ do year   <- get
+                             month  <- safeGet
+                             day    <- get
+                             hour   <- get
+                             mins   <- get
+                             sec    <- get
+                             pico   <- get
+                             wday   <- safeGet
+                             yday   <- get
+                             tzname <- get
+                             tz     <- safeGet
+                             dst    <- get
+                             return (CalendarTime year month day hour mins sec pico wday yday tzname tz dst)
+    putCopy t = contain $ do put     (ctYear t)
+                             safePut (ctMonth t)
+                             put     (ctDay t)
+                             put     (ctHour t)
+                             put     (ctMin t)
+                             put     (ctSec t)
+                             put     (ctPicosec t)
+                             safePut (ctWDay t)
+                             put     (ctYDay t)
+                             safePut (ctTZName t)
+                             put     (ctTZ t)
+                             put     (ctIsDST t)
