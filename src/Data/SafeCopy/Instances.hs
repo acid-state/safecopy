@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts, UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Data.SafeCopy.Instances where
 
@@ -6,11 +6,16 @@ import Data.SafeCopy.SafeCopy
 
 import Data.Word
 import Data.Int
+import Data.Fixed (HasResolution, Fixed)
+import Data.Ratio (Ratio, (%), numerator, denominator)
 import Data.Serialize
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
+import Data.Time.Calendar (Day(..))
+import Data.Time.Clock (DiffTime, NominalDiffTime, UniversalTime(..), UTCTime(..))
+import Data.Time.LocalTime (LocalTime(..), TimeOfDay(..), TimeZone(..), ZonedTime(..))
 import Control.Applicative
 import Data.Ix
 import qualified Data.Array as Array
@@ -159,6 +164,18 @@ instance SafeCopy Int32 where
     kind = primitive; getCopy = contain get; putCopy = contain . put
 instance SafeCopy Int64 where
     kind = primitive; getCopy = contain get; putCopy = contain . put
+instance (Integral a, SafeCopy a) => SafeCopy (Ratio a) where
+    kind = primitive;
+    getCopy   = contain $ do n <- safeGet
+                             d <- safeGet
+                             return (n % d)
+    putCopy r = contain $ do safePut (numerator   r)
+                             safePut (denominator r)
+instance (HasResolution a, Fractional (Fixed a)) => SafeCopy (Fixed a) where
+    kind = primitive
+    getCopy   = contain $ fromRational <$> safeGet
+    putCopy   = contain . safePut . toRational
+
 instance SafeCopy () where
     kind = primitive; getCopy = contain get; putCopy = contain . put
 instance SafeCopy Bool where
@@ -171,7 +188,7 @@ instance (SafeCopy a, SafeCopy b) => SafeCopy (Either a b) where
     putCopy (Right a) = contain $ put True >> safePut a
     putCopy (Left a) = contain $ put False >> safePut a
 
---  instances for 'text'
+--  instances for 'text' library
 
 instance SafeCopy T.Text where
     kind = base
@@ -182,3 +199,69 @@ instance SafeCopy TL.Text where
     kind = base
     getCopy = contain $ TL.decodeUtf8 <$> safeGet
     putCopy = contain . safePut . TL.encodeUtf8
+
+-- instances for 'time' library
+
+instance SafeCopy Day where
+    kind = base
+    getCopy = contain $ ModifiedJulianDay <$> safeGet
+    putCopy = contain . safePut . toModifiedJulianDay
+
+instance SafeCopy DiffTime where
+    kind = base
+    getCopy = contain $ fromRational <$> safeGet
+    putCopy = contain . safePut . toRational
+
+instance SafeCopy UniversalTime where
+    kind = base
+    getCopy = contain $ ModJulianDate <$> safeGet
+    putCopy = contain . safePut . getModJulianDate
+
+instance SafeCopy UTCTime where
+    kind = base
+    getCopy   = contain $ do day      <- safeGet
+                             diffTime <- safeGet
+                             return (UTCTime day diffTime)
+    putCopy u = contain $ do safePut (utctDay u)
+                             safePut (utctDayTime u)
+
+instance SafeCopy NominalDiffTime where
+    kind = base
+    getCopy = contain $ fromRational <$> safeGet
+    putCopy = contain . safePut . toRational
+
+instance SafeCopy TimeOfDay where
+    kind = base
+    getCopy   = contain $ do hour <- safeGet
+                             mins <- safeGet
+                             sec  <- safeGet
+                             return (TimeOfDay hour mins sec)
+    putCopy t = contain $ do safePut (todHour t)
+                             safePut (todMin t)
+                             safePut (todSec t)
+
+instance SafeCopy TimeZone where
+    kind = base
+    getCopy   = contain $ do mins       <- safeGet
+                             summerOnly <- safeGet
+                             zoneName   <- safeGet
+                             return (TimeZone mins summerOnly zoneName)
+    putCopy t = contain $ do safePut (timeZoneMinutes t)
+                             safePut (timeZoneSummerOnly t)
+                             safePut (timeZoneName t)
+
+instance SafeCopy LocalTime where
+    kind = base
+    getCopy   = contain $ do day <- safeGet
+                             tod <- safeGet
+                             return (LocalTime day tod)
+    putCopy t = contain $ do safePut (localDay t)
+                             safePut (localTimeOfDay t)
+
+instance SafeCopy ZonedTime where
+    kind = base
+    getCopy   = contain $ do localTime <- safeGet
+                             timeZone  <- safeGet
+                             return (ZonedTime localTime timeZone)
+    putCopy t = contain $ do safePut (zonedTimeToLocalTime t)
+                             safePut (zonedTimeZone t)
