@@ -1,5 +1,11 @@
 {-# LANGUAGE GADTs, TypeFamilies, FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+
+{-# LANGUAGE CPP #-}
+#ifdef DEFAULT_SIGNATURES
+{-# LANGUAGE DefaultSignatures #-}
+#endif
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.SafeCopy.SafeCopy
@@ -100,6 +106,13 @@ class SafeCopy a where
             proxy = proxyFromConsistency ret
         in ret
 
+#ifdef DEFAULT_SIGNATURES
+    default getCopy :: Serialize a => Contained (Get a)
+    getCopy = contain get
+
+    default putCopy :: Serialize a => a -> Contained Put
+    putCopy = contain . put
+#endif
 
 
 constructGetterFromVersion :: SafeCopy a => Version a -> Proxy a -> Get a

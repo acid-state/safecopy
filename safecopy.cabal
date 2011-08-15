@@ -61,3 +61,6 @@ Library
   -- Build-tools:
 
   GHC-Options:         -Wall
+
+  if(impl(ghc >= 7.2.1))
+    cpp-options: -DDEFAULT_SIGNATURES
