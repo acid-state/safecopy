@@ -57,6 +57,9 @@ data Kind a where
     Base      :: Kind a
     Extends   :: (Migrate a) => Proxy (MigrateFrom a) -> Kind a
 
+-- | Wrapper for data that was saved without a version tag.
+newtype Prim a = Prim { getPrimitive :: a }
+
 -- | The centerpiece of this library. Defines a version for a data type
 --   together with how it should be serialized/parsed.
 --

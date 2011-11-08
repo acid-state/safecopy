@@ -74,6 +74,7 @@ module Data.SafeCopy
       safeGet
     , safePut
     , SafeCopy(version, kind, getCopy, putCopy)
+    , Prim(..)
     , Migrate(..)
     , Kind
     , extension
