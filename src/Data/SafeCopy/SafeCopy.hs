@@ -109,6 +109,12 @@ class SafeCopy a where
             proxy = proxyFromConsistency ret
         in ret
 
+    -- | The name of the type. This is only used in error
+    -- message strings.
+    -- Feel free to leave undefined in your instances.
+    errorTypeName :: Proxy a -> String
+    errorTypeName _ = "<unkown type>"
+
 #ifdef DEFAULT_SIGNATURES
     default getCopy :: Serialize a => Contained (Get a)
     getCopy = contain get
@@ -122,10 +128,22 @@ constructGetterFromVersion :: SafeCopy a => Version a -> Proxy a -> Get a
 constructGetterFromVersion diskVersion a_proxy
     | version == diskVersion = unsafeUnPack getCopy
     | otherwise              = case kindFromProxy a_proxy of
-                                 Primitive -> fail "Cannot migrate from primitive types."
-                                 Base      -> fail $ "Cannot find getter associated with this version number: " ++ show diskVersion
+                                 Primitive -> fail $ errorMsg "Cannot migrate from primitive types."
+                                 Base      ->
+                                     fail $
+                                     errorMsg $
+                                     "Cannot find getter associated with this version number: " ++ show diskVersion
                                  Extends b_proxy
                                    -> fmap migrate (constructGetterFromVersion (castVersion diskVersion) b_proxy)
+
+  where
+    errorMsg msg =
+        concat
+         [ "safecopy: "
+         , errorTypeName a_proxy
+         , ": "
+         , msg
+         ]
 
 -------------------------------------------------
 -- The public interface. These functions are used

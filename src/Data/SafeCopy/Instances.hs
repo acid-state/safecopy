@@ -31,6 +31,7 @@ import           Data.Time.Clock (DiffTime, NominalDiffTime, UniversalTime(..), 
 import           Data.Time.Clock.TAI (AbsoluteTime, taiEpoch, addAbsoluteTime, diffAbsoluteTime)
 import           Data.Time.LocalTime (LocalTime(..), TimeOfDay(..), TimeZone(..), ZonedTime(..))
 import qualified Data.Tree as Tree
+import           Data.Typeable
 import           Data.Word
 import           System.Time (ClockTime(..), TimeDiff(..), CalendarTime(..), Month(..))
 import qualified System.Time as OT
@@ -52,37 +53,45 @@ instance SafeCopy a => SafeCopy [a] where
           do put (length lst)
              getSafePut >>= forM_ lst
 
+    errorTypeName = typeName1
+
 instance SafeCopy a => SafeCopy (Maybe a) where
     getCopy = contain $ do n <- get
                            if n then liftM Just safeGet
                                 else return Nothing
     putCopy (Just a) = contain $ put True >> safePut a
     putCopy Nothing = contain $ put False
+    errorTypeName = typeName1
 
 instance (SafeCopy a, Ord a) => SafeCopy (Set.Set a) where
     getCopy = contain $ fmap Set.fromDistinctAscList safeGet
     putCopy = contain . safePut . Set.toAscList
+    errorTypeName = typeName1
 
 instance (SafeCopy a, SafeCopy b, Ord a) => SafeCopy (Map.Map a b) where
     getCopy = contain $ fmap Map.fromDistinctAscList safeGet
     putCopy = contain . safePut . Map.toAscList
+    errorTypeName = typeName2
 
 instance (SafeCopy a) => SafeCopy (IntMap.IntMap a) where
     getCopy = contain $ fmap IntMap.fromDistinctAscList safeGet
     putCopy = contain . safePut . IntMap.toAscList
+    errorTypeName = typeName1
 
 instance SafeCopy IntSet.IntSet where
     getCopy = contain $ fmap IntSet.fromDistinctAscList safeGet
     putCopy = contain . safePut . IntSet.toAscList
+    errorTypeName = typeName
 
 instance (SafeCopy a) => SafeCopy (Sequence.Seq a) where
     getCopy = contain $ fmap Sequence.fromList safeGet
     putCopy = contain . safePut . Foldable.toList
+    errorTypeName = typeName1
 
 instance (SafeCopy a) => SafeCopy (Tree.Tree a) where
     getCopy = contain $ liftM2 Tree.Node safeGet safeGet
     putCopy (Tree.Node root sub) = contain $ safePut root >> safePut sub
-
+    errorTypeName = typeName1
 
 iarray_getCopy :: (Ix i, SafeCopy e, SafeCopy i, IArray.IArray a e) => Contained (Get (a i e))
 iarray_getCopy = contain $ do getIx <- getSafeGet
@@ -101,15 +110,17 @@ iarray_putCopy arr = contain $ do putIx <- getSafePut
 instance (Ix i, SafeCopy e, SafeCopy i) => SafeCopy (Array.Array i e) where
     getCopy = iarray_getCopy
     putCopy = iarray_putCopy
+    errorTypeName = typeName2
 
 instance (IArray.IArray UArray.UArray e, Ix i, SafeCopy e, SafeCopy i) => SafeCopy (UArray.UArray i e) where
     getCopy = iarray_getCopy
     putCopy = iarray_putCopy
-
+    errorTypeName = typeName2
 
 instance (SafeCopy a, SafeCopy b) => SafeCopy (a,b) where
     getCopy = contain $ liftM2 (,) safeGet safeGet
     putCopy (a,b) = contain $ safePut a >> safePut b
+    errorTypeName = typeName2
 instance (SafeCopy a, SafeCopy b, SafeCopy c) => SafeCopy (a,b,c) where
     getCopy = contain $ liftM3 (,,) safeGet safeGet safeGet
     putCopy (a,b,c) = contain $ safePut a >> safePut b >> safePut c
@@ -134,51 +145,53 @@ instance (SafeCopy a, SafeCopy b, SafeCopy c, SafeCopy d, SafeCopy e, SafeCopy f
 
 
 instance SafeCopy Int where
-    getCopy = contain get; putCopy = contain . put
+    getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
 instance SafeCopy Integer where
-    getCopy = contain get; putCopy = contain . put
+    getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
 instance SafeCopy Float where
-    getCopy = contain get; putCopy = contain . put
+    getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
 instance SafeCopy Double where
-    getCopy = contain get; putCopy = contain . put
+    getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
 instance SafeCopy L.ByteString where
-    getCopy = contain get; putCopy = contain . put
+    getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
 instance SafeCopy B.ByteString where
-    getCopy = contain get; putCopy = contain . put
+    getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
 instance SafeCopy Char where
-    getCopy = contain get; putCopy = contain . put
+    getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
 instance SafeCopy Word8 where
-    getCopy = contain get; putCopy = contain . put
+    getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
 instance SafeCopy Word16 where
-    getCopy = contain get; putCopy = contain . put
+    getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
 instance SafeCopy Word32 where
-    getCopy = contain get; putCopy = contain . put
+    getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
 instance SafeCopy Word64 where
-    getCopy = contain get; putCopy = contain . put
+    getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
 instance SafeCopy Ordering where
-    getCopy = contain get; putCopy = contain . put
+    getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
 instance SafeCopy Int8 where
-    getCopy = contain get; putCopy = contain . put
+    getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
 instance SafeCopy Int16 where
-    getCopy = contain get; putCopy = contain . put
+    getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
 instance SafeCopy Int32 where
-    getCopy = contain get; putCopy = contain . put
+    getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
 instance SafeCopy Int64 where
-    getCopy = contain get; putCopy = contain . put
+    getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
 instance (Integral a, SafeCopy a) => SafeCopy (Ratio a) where
     getCopy   = contain $ do n <- safeGet
                              d <- safeGet
                              return (n % d)
     putCopy r = contain $ do safePut (numerator   r)
                              safePut (denominator r)
+    errorTypeName = typeName1
 instance (HasResolution a, Fractional (Fixed a)) => SafeCopy (Fixed a) where
     getCopy   = contain $ fromRational <$> safeGet
     putCopy   = contain . safePut . toRational
+    errorTypeName = typeName1
 
 instance SafeCopy () where
-    getCopy = contain get; putCopy = contain . put
+    getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
 instance SafeCopy Bool where
-    getCopy = contain get; putCopy = contain . put
+    getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
 instance (SafeCopy a, SafeCopy b) => SafeCopy (Either a b) where
     getCopy = contain $ do n <- get
                            if n then liftM Right safeGet
@@ -186,17 +199,21 @@ instance (SafeCopy a, SafeCopy b) => SafeCopy (Either a b) where
     putCopy (Right a) = contain $ put True >> safePut a
     putCopy (Left a) = contain $ put False >> safePut a
 
+    errorTypeName = typeName2
+
 --  instances for 'text' library
 
 instance SafeCopy T.Text where
     kind = base
     getCopy = contain $ T.decodeUtf8 <$> safeGet
     putCopy = contain . safePut . T.encodeUtf8
+    errorTypeName = typeName
 
 instance SafeCopy TL.Text where
     kind = base
     getCopy = contain $ TL.decodeUtf8 <$> safeGet
     putCopy = contain . safePut . TL.encodeUtf8
+    errorTypeName = typeName
 
 -- instances for 'time' library
 
@@ -204,16 +221,19 @@ instance SafeCopy Day where
     kind = base
     getCopy = contain $ ModifiedJulianDay <$> safeGet
     putCopy = contain . safePut . toModifiedJulianDay
+    errorTypeName = typeName
 
 instance SafeCopy DiffTime where
     kind = base
     getCopy = contain $ fromRational <$> safeGet
     putCopy = contain . safePut . toRational
+    errorTypeName = typeName
 
 instance SafeCopy UniversalTime where
     kind = base
     getCopy = contain $ ModJulianDate <$> safeGet
     putCopy = contain . safePut . getModJulianDate
+    errorTypeName = typeName
 
 instance SafeCopy UTCTime where
     kind = base
@@ -222,11 +242,13 @@ instance SafeCopy UTCTime where
                              return (UTCTime day diffTime)
     putCopy u = contain $ do safePut (utctDay u)
                              safePut (utctDayTime u)
+    errorTypeName = typeName
 
 instance SafeCopy NominalDiffTime where
     kind = base
     getCopy = contain $ fromRational <$> safeGet
     putCopy = contain . safePut . toRational
+    errorTypeName = typeName
 
 instance SafeCopy TimeOfDay where
     kind = base
@@ -237,6 +259,7 @@ instance SafeCopy TimeOfDay where
     putCopy t = contain $ do safePut (todHour t)
                              safePut (todMin t)
                              safePut (todSec t)
+    errorTypeName = typeName
 
 instance SafeCopy TimeZone where
     kind = base
@@ -247,6 +270,7 @@ instance SafeCopy TimeZone where
     putCopy t = contain $ do safePut (timeZoneMinutes t)
                              safePut (timeZoneSummerOnly t)
                              safePut (timeZoneName t)
+    errorTypeName = typeName
 
 instance SafeCopy LocalTime where
     kind = base
@@ -255,6 +279,7 @@ instance SafeCopy LocalTime where
                              return (LocalTime day tod)
     putCopy t = contain $ do safePut (localDay t)
                              safePut (localTimeOfDay t)
+    errorTypeName = typeName
 
 instance SafeCopy ZonedTime where
     kind = base
@@ -263,6 +288,7 @@ instance SafeCopy ZonedTime where
                              return (ZonedTime localTime timeZone)
     putCopy t = contain $ do safePut (zonedTimeToLocalTime t)
                              safePut (zonedTimeZone t)
+    errorTypeName = typeName
 
 instance SafeCopy AbsoluteTime where
   getCopy = contain $ liftM toAbsoluteTime safeGet
@@ -273,6 +299,7 @@ instance SafeCopy AbsoluteTime where
     where
       fromAbsoluteTime :: AbsoluteTime -> DiffTime
       fromAbsoluteTime at = diffAbsoluteTime at taiEpoch
+  errorTypeName = typeName
 
 -- instances for old-time
 
@@ -337,3 +364,12 @@ instance SafeCopy CalendarTime where
                              safePut (ctTZName t)
                              put     (ctTZ t)
                              put     (ctIsDST t)
+
+typeName :: Typeable a => Proxy a -> String
+typeName proxy = show (typeOf (undefined `asProxyType` proxy))
+
+typeName1 :: (Typeable1 c) => Proxy (c a) -> String
+typeName1 proxy = show (typeOf1 (undefined `asProxyType` proxy))
+
+typeName2 :: (Typeable2 c) => Proxy (c a b) -> String
+typeName2 proxy = show (typeOf2 (undefined `asProxyType` proxy))

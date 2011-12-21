@@ -13,6 +13,7 @@ import Language.Haskell.TH hiding (Kind(..))
 import Control.Applicative
 import Control.Monad
 import Data.Maybe (fromMaybe)
+import Data.Typeable (Typeable, typeOf)
 import Data.Word (Word8) -- Haddock
 
 -- | Derive an instance of 'SafeCopy'.
@@ -227,6 +228,7 @@ internalDeriveSafeCopy deriveType versionId kindName tyName
                                        , mkGetCopy deriveType tyName cons
                                        , valD (varP 'version) (normalB $ litE $ integerL $ fromIntegral $ unVersion versionId) []
                                        , valD (varP 'kind) (normalB (varE kindName)) []
+                                       , funD 'errorTypeName [clause [wildP] (normalB $ litE $ StringL (show tyName)) []]
                                        ]
 
 mkPutCopy :: DeriveType -> [(Integer, Con)] -> DecQ
