@@ -42,6 +42,10 @@ Build-type:          Simple
 -- Constraint on the version of Cabal needed to build this package.
 Cabal-version:       >=1.6
 
+Source-repository head
+  type:          darcs
+  location:      http://mirror.seize.it/safecopy/
+
 
 Library
   -- Modules exported by the library.
