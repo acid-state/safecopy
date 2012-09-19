@@ -7,7 +7,7 @@ Name:                safecopy
 -- The package version. See the Haskell package versioning policy
 -- (http://www.haskell.org/haskellwiki/Package_versioning_policy) for
 -- standards guiding when and how versions should be incremented.
-Version:             0.6.1
+Version:             0.6.2
 
 -- A short (one-line) description of the package.
 Synopsis:            Binary serialization with version control.
@@ -44,7 +44,7 @@ Cabal-version:       >=1.6
 
 Source-repository head
   type:          darcs
-  location:      http://mirror.seize.it/safecopy/
+  location:      http://hub.darcs.net/Lemmih/safecopy
 
 
 Library
