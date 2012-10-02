@@ -2,8 +2,11 @@
 module Data.SafeCopy.Derive
     (
       deriveSafeCopy
+    , deriveSafeCopyIndexedType
     , deriveSafeCopySimple
+    , deriveSafeCopySimpleIndexedType
     , deriveSafeCopyHappstackData
+    , deriveSafeCopyHappstackDataIndexedType
     ) where
 
 import Data.Serialize (getWord8, putWord8)
@@ -104,6 +107,9 @@ import Data.Word (Word8) -- Haddock
 deriveSafeCopy :: Version a -> Name -> Name -> Q [Dec]
 deriveSafeCopy = internalDeriveSafeCopy Normal
 
+deriveSafeCopyIndexedType :: Version a -> Name -> Name -> [Name] -> Q [Dec]
+deriveSafeCopyIndexedType = internalDeriveSafeCopyIndexedType Normal
+
 -- | Derive an instance of 'SafeCopy'.  The instance derived by
 --   this function is simpler than the one derived by
 --   'deriveSafeCopy' in that we always use 'safePut' and
@@ -156,6 +162,9 @@ deriveSafeCopy = internalDeriveSafeCopy Normal
 deriveSafeCopySimple :: Version a -> Name -> Name -> Q [Dec]
 deriveSafeCopySimple = internalDeriveSafeCopy Simple
 
+deriveSafeCopySimpleIndexedType :: Version a -> Name -> Name -> [Name] -> Q [Dec]
+deriveSafeCopySimpleIndexedType = internalDeriveSafeCopyIndexedType Simple
+
 -- | Derive an instance of 'SafeCopy'.  The instance derived by
 --   this function should be compatible with the instance derived
 --   by the module @Happstack.Data.SerializeTH@ of the
@@ -203,6 +212,9 @@ deriveSafeCopySimple = internalDeriveSafeCopy Simple
 deriveSafeCopyHappstackData :: Version a -> Name -> Name -> Q [Dec]
 deriveSafeCopyHappstackData = internalDeriveSafeCopy HappstackData
 
+deriveSafeCopyHappstackDataIndexedType :: Version a -> Name -> Name -> [Name] -> Q [Dec]
+deriveSafeCopyHappstackDataIndexedType = internalDeriveSafeCopyIndexedType HappstackData
+
 data DeriveType = Normal | Simple | HappstackData
 
 forceTag :: DeriveType -> Bool
@@ -210,19 +222,63 @@ forceTag HappstackData = True
 forceTag _             = False
 
 internalDeriveSafeCopy :: DeriveType -> Version a -> Name -> Name -> Q [Dec]
-internalDeriveSafeCopy deriveType versionId kindName tyName
-    = do info <- reify tyName
-         case info of
-           TyConI (DataD context _name tyvars cons _derivs)
-             | length cons > 255 -> fail $ "Can't derive SafeCopy instance for: " ++ show tyName ++
-                                           ". The datatype must have less than 256 constructors."
-             | otherwise         -> worker context tyvars (zip [0..] cons)
-           TyConI (NewtypeD context _name tyvars con _derivs)
-             -> worker context tyvars [(0, con)]
-           _ -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info)
-    where worker context tyvars cons
-              = let ty = foldl appT (conT tyName) [ varT var | PlainTV var <- tyvars ]
-                in (:[]) <$> instanceD (cxt $ [classP ''SafeCopy [varT var] | PlainTV var <- tyvars] ++ map return context)
+internalDeriveSafeCopy deriveType versionId kindName tyName = do
+  info <- reify tyName
+  case info of
+    TyConI (DataD context _name tyvars cons _derivs)
+      | length cons > 255 -> fail $ "Can't derive SafeCopy instance for: " ++ show tyName ++
+                                    ". The datatype must have less than 256 constructors."
+      | otherwise         -> worker context tyvars (zip [0..] cons)
+    TyConI (NewtypeD context _name tyvars con _derivs) ->
+      worker context tyvars [(0, con)]
+    FamilyI _ insts -> do
+      decs <- forM insts $ \inst ->
+        case inst of
+          DataInstD context _name ty cons _derivs ->
+            worker' (foldl appT (conT tyName) (map return ty)) context [] (zip [0..] cons)
+          NewtypeInstD context _name ty con _derivs ->
+            worker' (foldl appT (conT tyName) (map return ty)) context [] [(0, con)]
+          _ -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, inst)
+      return $ concat decs
+    _ -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info)
+  where
+    worker = worker' (conT tyName)
+    worker' tyBase context tyvars cons =
+      let ty = foldl appT tyBase [ varT var | PlainTV var <- tyvars ]
+      in (:[]) <$> instanceD (cxt $ [classP ''SafeCopy [varT var] | PlainTV var <- tyvars] ++ map return context)
+                                       (conT ''SafeCopy `appT` ty)
+                                       [ mkPutCopy deriveType cons
+                                       , mkGetCopy deriveType tyName cons
+                                       , valD (varP 'version) (normalB $ litE $ integerL $ fromIntegral $ unVersion versionId) []
+                                       , valD (varP 'kind) (normalB (varE kindName)) []
+                                       , funD 'errorTypeName [clause [wildP] (normalB $ litE $ StringL (show tyName)) []]
+                                       ]
+
+internalDeriveSafeCopyIndexedType :: DeriveType -> Version a -> Name -> Name -> [Name] -> Q [Dec]
+internalDeriveSafeCopyIndexedType deriveType versionId kindName tyName tyIndex' = do
+  tyIndex <- mapM conT tyIndex'
+  info <- reify tyName
+  case info of
+    FamilyI _ insts -> do
+      decs <- forM insts $ \inst ->
+        case inst of
+          DataInstD context _name ty cons _derivs
+            | ty == tyIndex ->
+              worker' (foldl appT (conT tyName) (map return ty)) context [] (zip [0..] cons)
+            | otherwise ->
+              return []
+          NewtypeInstD context _name ty con _derivs
+            | ty == tyIndex ->
+              worker' (foldl appT (conT tyName) (map return ty)) context [] [(0, con)]
+            | otherwise ->
+              return []
+          _ -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, inst)
+      return $ concat decs
+    _ -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info)
+  where
+    worker' tyBase context tyvars cons =
+      let ty = foldl appT tyBase [ varT var | PlainTV var <- tyvars ]
+      in (:[]) <$> instanceD (cxt $ [classP ''SafeCopy [varT var] | PlainTV var <- tyvars] ++ map return context)
                                        (conT ''SafeCopy `appT` ty)
                                        [ mkPutCopy deriveType cons
                                        , mkGetCopy deriveType tyName cons
