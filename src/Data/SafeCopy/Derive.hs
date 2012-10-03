@@ -231,15 +231,6 @@ internalDeriveSafeCopy deriveType versionId kindName tyName = do
       | otherwise         -> worker context tyvars (zip [0..] cons)
     TyConI (NewtypeD context _name tyvars con _derivs) ->
       worker context tyvars [(0, con)]
-    FamilyI _ insts -> do
-      decs <- forM insts $ \inst ->
-        case inst of
-          DataInstD context _name ty cons _derivs ->
-            worker' (foldl appT (conT tyName) (map return ty)) context [] (zip [0..] cons)
-          NewtypeInstD context _name ty con _derivs ->
-            worker' (foldl appT (conT tyName) (map return ty)) context [] [(0, con)]
-          _ -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, inst)
-      return $ concat decs
     _ -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info)
   where
     worker = worker' (conT tyName)
