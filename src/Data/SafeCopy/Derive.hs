@@ -9,7 +9,7 @@ module Data.SafeCopy.Derive
     , deriveSafeCopyHappstackDataIndexedType
     ) where
 
-import Data.Serialize (getWord8, putWord8)
+import Data.Serialize (getWord8, putWord8, label)
 import Data.SafeCopy.SafeCopy
 
 import Language.Haskell.TH hiding (Kind(..))
@@ -233,13 +233,14 @@ internalDeriveSafeCopy deriveType versionId kindName tyName = do
       worker context tyvars [(0, con)]
     _ -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info)
   where
+    typeName = show tyName
     worker = worker' (conT tyName)
     worker' tyBase context tyvars cons =
       let ty = foldl appT tyBase [ varT var | PlainTV var <- tyvars ]
       in (:[]) <$> instanceD (cxt $ [classP ''SafeCopy [varT var] | PlainTV var <- tyvars] ++ map return context)
                                        (conT ''SafeCopy `appT` ty)
                                        [ mkPutCopy deriveType cons
-                                       , mkGetCopy deriveType tyName cons
+                                       , mkGetCopy deriveType typeName cons
                                        , valD (varP 'version) (normalB $ litE $ integerL $ fromIntegral $ unVersion versionId) []
                                        , valD (varP 'kind) (normalB (varE kindName)) []
                                        , funD 'errorTypeName [clause [wildP] (normalB $ litE $ StringL (show tyName)) []]
@@ -267,15 +268,16 @@ internalDeriveSafeCopyIndexedType deriveType versionId kindName tyName tyIndex' 
       return $ concat decs
     _ -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info)
   where
+    typeName = unwords $ map show (tyName:tyIndex')
     worker' tyBase context tyvars cons =
       let ty = foldl appT tyBase [ varT var | PlainTV var <- tyvars ]
       in (:[]) <$> instanceD (cxt $ [classP ''SafeCopy [varT var] | PlainTV var <- tyvars] ++ map return context)
                                        (conT ''SafeCopy `appT` ty)
                                        [ mkPutCopy deriveType cons
-                                       , mkGetCopy deriveType tyName cons
+                                       , mkGetCopy deriveType typeName cons
                                        , valD (varP 'version) (normalB $ litE $ integerL $ fromIntegral $ unVersion versionId) []
                                        , valD (varP 'kind) (normalB (varE kindName)) []
-                                       , funD 'errorTypeName [clause [wildP] (normalB $ litE $ StringL (show tyName)) []]
+                                       , funD 'errorTypeName [clause [wildP] (normalB $ litE $ StringL typeName) []]
                                        ]
 
 mkPutCopy :: DeriveType -> [(Integer, Con)] -> DecQ
@@ -295,9 +297,11 @@ mkPutCopy deriveType cons = funD 'putCopy $ map mkPutClause cons
                                    [ noBindS $ varE 'return `appE` tupE [] ])
                clause [putClause] (normalB putCopyBody) []
 
-mkGetCopy :: DeriveType -> Name -> [(Integer, Con)] -> DecQ
-mkGetCopy deriveType tyName cons = valD (varP 'getCopy) (normalB $ varE 'contain `appE` getCopyBody) []
+mkGetCopy :: DeriveType -> String -> [(Integer, Con)] -> DecQ
+mkGetCopy deriveType tyName cons = valD (varP 'getCopy) (normalB $ varE 'contain `appE` mkLabel) []
     where
+      mkLabel = varE 'label `appE` litE (stringL labelString) `appE` getCopyBody
+      labelString = tyName ++ ":"
       getCopyBody
           = case cons of
               [(_, con)] | not (forceTag deriveType) -> mkGetBody con
