@@ -134,7 +134,8 @@ constructGetterFromVersion diskVersion a_proxy
                                      errorMsg $
                                      "Cannot find getter associated with this version number: " ++ show diskVersion
                                  Extends b_proxy
-                                   -> fmap migrate (constructGetterFromVersion (castVersion diskVersion) b_proxy)
+                                   -> do previous <- constructGetterFromVersion (castVersion diskVersion) b_proxy
+                                         return $! migrate previous
 
   where
     errorMsg msg =
