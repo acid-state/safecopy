@@ -41,6 +41,8 @@ class SafeCopy (MigrateFrom a) => Migrate a where
     --   all taken care of internally in the library.
     migrate :: MigrateFrom a -> a
 
+newtype Reverse a = Reverse { unReverse :: a }
+
 -- | The kind of a data type determines how it is tagged (if at all).
 --
 --   Primitives kinds (see 'primitive') are not tagged with a version
@@ -56,6 +58,7 @@ data Kind a where
     Primitive :: Kind a
     Base      :: Kind a
     Extends   :: (Migrate a) => Proxy (MigrateFrom a) -> Kind a
+    Extended  :: (Migrate (Reverse a)) => Kind a -> Kind a
 
 -- | Wrapper for data that was saved without a version tag.
 newtype Prim a = Prim { getPrimitive :: a }
@@ -124,24 +127,39 @@ class SafeCopy a where
 #endif
 
 
-constructGetterFromVersion :: SafeCopy a => Version a -> Proxy a -> Get a
-constructGetterFromVersion diskVersion a_proxy
-    | version == diskVersion = unsafeUnPack getCopy
-    | otherwise              = case kindFromProxy a_proxy of
-                                 Primitive -> fail $ errorMsg "Cannot migrate from primitive types."
-                                 Base      ->
-                                     fail $
-                                     errorMsg $
-                                     "Cannot find getter associated with this version number: " ++ show diskVersion
-                                 Extends b_proxy
-                                   -> do previous <- constructGetterFromVersion (castVersion diskVersion) b_proxy
-                                         return $! migrate previous
-
+-- constructGetterFromVersion :: SafeCopy a => Version a -> Kind (MigrateFrom (Reverse a)) -> Get (Get a)
+constructGetterFromVersion :: SafeCopy a => Version a -> Kind a -> Either String (Get a)
+constructGetterFromVersion diskVersion a_kind =
+  worker False diskVersion a_kind
   where
-    errorMsg msg =
+    worker :: forall a. SafeCopy a => Bool -> Version a -> Kind a -> Either String (Get a)
+    worker fwd thisVersion thisKind
+      | version == thisVersion = return $ unsafeUnPack getCopy
+      | otherwise =
+        case thisKind of
+          Primitive -> Left $ errorMsg thisKind "Cannot migrate from primitive types."
+          Base      -> Left $ errorMsg thisKind versionNotFound
+          Extends b_proxy -> do
+            previousGetter <- worker fwd (castVersion diskVersion) (kindFromProxy b_proxy)
+            return $ fmap migrate previousGetter
+          Extended kind | fwd -> Left $ errorMsg thisKind versionNotFound
+          Extended kind -> do
+            let b_proxy :: Proxy (MigrateFrom (Reverse a))
+                b_proxy = Proxy
+                p_proxy :: Proxy (MigrateFrom a)
+                p_proxy = Proxy
+                forwardGetter :: Either String (Get a)
+                forwardGetter  = fmap (fmap (unReverse . migrate)) $ worker True (castVersion thisVersion) (kindFromProxy b_proxy)
+                previousGetter :: Either String (Get a)
+                previousGetter = worker fwd (castVersion thisVersion) kind
+            case forwardGetter of
+              Left{}    -> previousGetter
+              Right val -> Right val
+    versionNotFound   = "Cannot find getter associated with this version number: " ++ show diskVersion
+    errorMsg kind msg =
         concat
          [ "safecopy: "
-         , errorTypeName a_proxy
+         , errorTypeName (proxyFromKind kind)
          , ": "
          , msg
          ]
@@ -165,8 +183,10 @@ getSafeGet
     = checkConsistency proxy $
       case kindFromProxy proxy of
         Primitive -> return $ unsafeUnPack getCopy
-        _         -> do v <- get
-                        return $ constructGetterFromVersion v proxy
+        kind      -> do v <- get
+                        case constructGetterFromVersion v kind of
+                          Right getter -> return getter
+                          Left msg     -> fail msg
     where proxy = Proxy :: Proxy a
 
 -- | Serialize a data type by first writing out its version tag. This is much
@@ -187,6 +207,12 @@ getSafePut
         _         -> do put (versionFromProxy proxy)
                         return $ \a -> unsafeUnPack (putCopy $ asProxyType a proxy)
     where proxy = Proxy :: Proxy a
+
+extended_extension :: (SafeCopy a, Migrate a, Migrate (Reverse a)) => Kind a
+extended_extension = Extended extension
+
+extended_base :: (Migrate (Reverse a)) => Kind a
+extended_base = Extended base
 
 -- | The extension kind lets the system know that there is
 --   at least one previous version of this type. A given data type
@@ -249,25 +275,32 @@ contain = Contained
 data Consistency a = Consistent | NotConsistent String
 
 availableVersions :: SafeCopy a => Proxy a -> [Int32]
-availableVersions a_proxy
-    = case kindFromProxy a_proxy of
-        Primitive -> []
-        Base      -> [unVersion (versionFromProxy a_proxy)]
-        Extends b_proxy ->unVersion (versionFromProxy a_proxy) : availableVersions b_proxy
+availableVersions a_proxy =
+  worker True (kindFromProxy a_proxy)
+  where
+    worker :: SafeCopy b => Bool -> Kind b -> [Int32]
+    worker fwd Primitive         = []
+    worker fwd kind@Base              = [unVersion (versionFromKind kind)]
+    worker fwd kind@(Extends b_proxy) = unVersion (versionFromKind kind) : worker False (kindFromProxy b_proxy)
+    worker True (Extended kind)  = unVersion (versionFromReverseKind kind) : worker False kind
+    worker False (Extended kind) = worker False kind
 
 -- Extend chains must end in a Base kind. Ending in a Primitive is an error.
 validChain :: SafeCopy a => Proxy a -> Bool
-validChain a_proxy
-    = case kindFromProxy a_proxy of
-        Primitive       -> True
-        Base            -> True
-        Extends b_proxy -> check b_proxy
-    where check :: SafeCopy b => Proxy b -> Bool
-          check b_proxy
-              = case kindFromProxy b_proxy of
+validChain a_proxy =
+  worker (kindFromProxy a_proxy)
+  where
+    worker Primitive         = True
+    worker Base              = True
+    worker (Extends b_proxy) = check (kindFromProxy b_proxy)
+    worker (Extended kind)   = worker kind
+    check :: SafeCopy b => Kind b -> Bool
+    check kind
+              = case kind of
                   Primitive       -> False
                   Base            -> True
-                  Extends c_proxy -> check c_proxy
+                  Extends c_proxy -> check (kindFromProxy c_proxy)
+                  Extended kind   -> check kind
 
 -- Verify that the SafeCopy instance is consistent.
 checkConsistency :: (SafeCopy a, Monad m) => Proxy a -> m b -> m b
@@ -303,11 +336,20 @@ isObviouslyConsistent _         = False
 proxyFromConsistency :: Consistency a -> Proxy a
 proxyFromConsistency _ = Proxy
 
+proxyFromKind :: Kind a -> Proxy a
+proxyFromKind _ = Proxy
+
 consistentFromProxy :: SafeCopy a => Proxy a -> Consistency a
 consistentFromProxy _ = internalConsistency
 
 versionFromProxy :: SafeCopy a => Proxy a -> Version a
 versionFromProxy _ = version
+
+versionFromKind :: (SafeCopy a) => Kind a -> Version a
+versionFromKind _ = version
+
+versionFromReverseKind :: (SafeCopy a, SafeCopy (MigrateFrom (Reverse a))) => Kind a -> Version (MigrateFrom (Reverse a))
+versionFromReverseKind _ = version
 
 kindFromProxy :: SafeCopy a => Proxy a -> Kind a
 kindFromProxy _ = kind

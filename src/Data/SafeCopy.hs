@@ -76,8 +76,12 @@ module Data.SafeCopy
     , SafeCopy(version, kind, getCopy, putCopy, errorTypeName)
     , Prim(..)
     , Migrate(..)
+    , Reverse(..)
     , Kind
     , extension
+    , extended_extension
+    , extended_base
+    , base
     , Contained
     , contain
     , Version
@@ -94,7 +98,6 @@ module Data.SafeCopy
     , getSafeGet
     , getSafePut
     , primitive
-    , base
     ) where
 
 import Data.SafeCopy.Instances ()
