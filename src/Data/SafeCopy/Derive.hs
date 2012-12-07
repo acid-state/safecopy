@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell, CPP #-}
 module Data.SafeCopy.Derive
     (
       deriveSafeCopy
@@ -16,8 +16,9 @@ import Language.Haskell.TH hiding (Kind(..))
 import Control.Applicative
 import Control.Monad
 import Data.Maybe (fromMaybe)
-import Data.Typeable (Typeable, typeOf)
+#ifdef __HADDOCK__
 import Data.Word (Word8) -- Haddock
+#endif
 
 -- | Derive an instance of 'SafeCopy'.
 --
@@ -233,14 +234,13 @@ internalDeriveSafeCopy deriveType versionId kindName tyName = do
       worker context tyvars [(0, con)]
     _ -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info)
   where
-    typeName = show tyName
     worker = worker' (conT tyName)
     worker' tyBase context tyvars cons =
       let ty = foldl appT tyBase [ varT var | PlainTV var <- tyvars ]
       in (:[]) <$> instanceD (cxt $ [classP ''SafeCopy [varT var] | PlainTV var <- tyvars] ++ map return context)
                                        (conT ''SafeCopy `appT` ty)
                                        [ mkPutCopy deriveType cons
-                                       , mkGetCopy deriveType typeName cons
+                                       , mkGetCopy deriveType (show tyName) cons
                                        , valD (varP 'version) (normalB $ litE $ integerL $ fromIntegral $ unVersion versionId) []
                                        , valD (varP 'kind) (normalB (varE kindName)) []
                                        , funD 'errorTypeName [clause [wildP] (normalB $ litE $ StringL (show tyName)) []]
@@ -268,16 +268,16 @@ internalDeriveSafeCopyIndexedType deriveType versionId kindName tyName tyIndex' 
       return $ concat decs
     _ -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info)
   where
-    typeName = unwords $ map show (tyName:tyIndex')
+    typeNameStr = unwords $ map show (tyName:tyIndex')
     worker' tyBase context tyvars cons =
       let ty = foldl appT tyBase [ varT var | PlainTV var <- tyvars ]
       in (:[]) <$> instanceD (cxt $ [classP ''SafeCopy [varT var] | PlainTV var <- tyvars] ++ map return context)
                                        (conT ''SafeCopy `appT` ty)
                                        [ mkPutCopy deriveType cons
-                                       , mkGetCopy deriveType typeName cons
+                                       , mkGetCopy deriveType typeNameStr cons
                                        , valD (varP 'version) (normalB $ litE $ integerL $ fromIntegral $ unVersion versionId) []
                                        , valD (varP 'kind) (normalB (varE kindName)) []
-                                       , funD 'errorTypeName [clause [wildP] (normalB $ litE $ StringL typeName) []]
+                                       , funD 'errorTypeName [clause [wildP] (normalB $ litE $ StringL typeNameStr) []]
                                        ]
 
 mkPutCopy :: DeriveType -> [(Integer, Con)] -> DecQ

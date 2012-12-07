@@ -130,8 +130,8 @@ class SafeCopy a where
 
 -- constructGetterFromVersion :: SafeCopy a => Version a -> Kind (MigrateFrom (Reverse a)) -> Get (Get a)
 constructGetterFromVersion :: SafeCopy a => Version a -> Kind a -> Either String (Get a)
-constructGetterFromVersion diskVersion a_kind =
-  worker False diskVersion a_kind
+constructGetterFromVersion diskVersion orig_kind =
+  worker False diskVersion orig_kind
   where
     worker :: forall a. SafeCopy a => Bool -> Version a -> Kind a -> Either String (Get a)
     worker fwd thisVersion thisKind
@@ -143,24 +143,22 @@ constructGetterFromVersion diskVersion a_kind =
           Extends b_proxy -> do
             previousGetter <- worker fwd (castVersion diskVersion) (kindFromProxy b_proxy)
             return $ fmap migrate previousGetter
-          Extended kind | fwd -> Left $ errorMsg thisKind versionNotFound
-          Extended kind -> do
-            let b_proxy :: Proxy (MigrateFrom (Reverse a))
-                b_proxy = Proxy
-                p_proxy :: Proxy (MigrateFrom a)
-                p_proxy = Proxy
+          Extended{} | fwd -> Left $ errorMsg thisKind versionNotFound
+          Extended a_kind -> do
+            let rev_proxy :: Proxy (MigrateFrom (Reverse a))
+                rev_proxy = Proxy
                 forwardGetter :: Either String (Get a)
-                forwardGetter  = fmap (fmap (unReverse . migrate)) $ worker True (castVersion thisVersion) (kindFromProxy b_proxy)
+                forwardGetter  = fmap (fmap (unReverse . migrate)) $ worker True (castVersion thisVersion) (kindFromProxy rev_proxy)
                 previousGetter :: Either String (Get a)
-                previousGetter = worker fwd (castVersion thisVersion) kind
+                previousGetter = worker fwd (castVersion thisVersion) a_kind
             case forwardGetter of
               Left{}    -> previousGetter
               Right val -> Right val
     versionNotFound   = "Cannot find getter associated with this version number: " ++ show diskVersion
-    errorMsg kind msg =
+    errorMsg fail_kind msg =
         concat
          [ "safecopy: "
-         , errorTypeName (proxyFromKind kind)
+         , errorTypeName (proxyFromKind fail_kind)
          , ": "
          , msg
          ]
@@ -184,8 +182,8 @@ getSafeGet
     = checkConsistency proxy $
       case kindFromProxy proxy of
         Primitive -> return $ unsafeUnPack getCopy
-        kind      -> do v <- get
-                        case constructGetterFromVersion v kind of
+        a_kind    -> do v <- get
+                        case constructGetterFromVersion v a_kind of
                           Right getter -> return getter
                           Left msg     -> fail msg
     where proxy = Proxy :: Proxy a
@@ -284,11 +282,13 @@ availableVersions a_proxy =
   worker True (kindFromProxy a_proxy)
   where
     worker :: SafeCopy b => Bool -> Kind b -> [Int32]
-    worker fwd Primitive         = []
-    worker fwd kind@Base              = [unVersion (versionFromKind kind)]
-    worker fwd kind@(Extends b_proxy) = unVersion (versionFromKind kind) : worker False (kindFromProxy b_proxy)
-    worker True (Extended kind)  = unVersion (versionFromReverseKind kind) : worker False kind
-    worker False (Extended kind) = worker False kind
+    worker fwd b_kind =
+      case b_kind of
+        Primitive         -> []
+        Base              -> [unVersion (versionFromKind b_kind)]
+        Extends b_proxy   -> unVersion (versionFromKind b_kind) : worker False (kindFromProxy b_proxy)
+        Extended sub_kind | fwd  -> worker False sub_kind
+        Extended sub_kind -> worker False sub_kind
 
 -- Extend chains must end in a Base kind. Ending in a Primitive is an error.
 validChain :: SafeCopy a => Proxy a -> Bool
@@ -298,14 +298,14 @@ validChain a_proxy =
     worker Primitive         = True
     worker Base              = True
     worker (Extends b_proxy) = check (kindFromProxy b_proxy)
-    worker (Extended kind)   = worker kind
+    worker (Extended a_kind)   = worker a_kind
     check :: SafeCopy b => Kind b -> Bool
-    check kind
-              = case kind of
+    check b_kind
+              = case b_kind of
                   Primitive       -> False
                   Base            -> True
                   Extends c_proxy -> check (kindFromProxy c_proxy)
-                  Extended kind   -> check kind
+                  Extended sub_kind   -> check sub_kind
 
 -- Verify that the SafeCopy instance is consistent.
 checkConsistency :: (SafeCopy a, Monad m) => Proxy a -> m b -> m b
