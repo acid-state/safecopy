@@ -41,6 +41,7 @@ class SafeCopy (MigrateFrom a) => Migrate a where
     --   all taken care of internally in the library.
     migrate :: MigrateFrom a -> a
 
+-- | This is a wrapper type used migrating backwards in the chain of compatible types.
 newtype Reverse a = Reverse { unReverse :: a }
 
 -- | The kind of a data type determines how it is tagged (if at all).
@@ -208,9 +209,13 @@ getSafePut
                         return $ \a -> unsafeUnPack (putCopy $ asProxyType a proxy)
     where proxy = Proxy :: Proxy a
 
+-- | The extended_base kind lets the system know that there is
+--   at least one future version of this type.
 extended_extension :: (SafeCopy a, Migrate a, Migrate (Reverse a)) => Kind a
 extended_extension = Extended extension
 
+-- | The extended_base kind lets the system know that there is
+--   at least one future version of this type.
 extended_base :: (Migrate (Reverse a)) => Kind a
 extended_base = Extended base
 
