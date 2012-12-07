@@ -64,7 +64,7 @@ Library
   -- Extra tools (e.g. alex, hsc2hs, ...) needed to build the source.
   -- Build-tools:
 
-  GHC-Options:         -Wall -Werror
+  GHC-Options:         -Wall
 
   if(impl(ghc >= 7.2.1))
     cpp-options: -DDEFAULT_SIGNATURES
