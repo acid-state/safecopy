@@ -61,6 +61,10 @@ data Kind a where
     Extends   :: (Migrate a) => Proxy (MigrateFrom a) -> Kind a
     Extended  :: (Migrate (Reverse a)) => Kind a -> Kind a
 
+isPrimitive :: Kind a -> Bool
+isPrimitive Primitive = True
+isPrimitive _ = False
+
 -- | Wrapper for data that was saved without a version tag.
 newtype Prim a = Prim { getPrimitive :: a }
 
@@ -108,10 +112,11 @@ class SafeCopy a where
     --   lifetime, instead of everytime 'safeGet' or 'safePut' is
     --   used.
     internalConsistency :: Consistency a
-    internalConsistency =
-        let ret = computeConsistency proxy
-            proxy = proxyFromConsistency ret
-        in ret
+    internalConsistency = computeConsistency Proxy
+
+    -- | Version profile.
+    objectProfile :: Profile a
+    objectProfile = mkProfile Proxy
 
     -- | The name of the type. This is only used in error
     -- message strings.
@@ -275,6 +280,24 @@ contain = Contained
 -------------------------------------------------
 -- Consistency checking
 
+data Profile a =
+  PrimitiveProfile |
+  InvalidProfile String |
+  Profile
+  { profileCurrentVersion :: Int32
+  , profileSupportedVersions :: [Int32]
+  } deriving (Show)
+
+mkProfile :: SafeCopy a => Proxy a -> Profile a
+mkProfile a_proxy =
+  case computeConsistency a_proxy of
+    NotConsistent msg -> InvalidProfile msg
+    Consistent | isPrimitive (kindFromProxy a_proxy) -> PrimitiveProfile
+    Consistent ->
+      Profile{ profileCurrentVersion    = unVersion (versionFromProxy a_proxy)
+             , profileSupportedVersions = availableVersions a_proxy
+             }
+
 data Consistency a = Consistent | NotConsistent String
 
 availableVersions :: SafeCopy a => Proxy a -> [Int32]
@@ -287,8 +310,11 @@ availableVersions a_proxy =
         Primitive         -> []
         Base              -> [unVersion (versionFromKind b_kind)]
         Extends b_proxy   -> unVersion (versionFromKind b_kind) : worker False (kindFromProxy b_proxy)
-        Extended sub_kind | fwd  -> worker False sub_kind
+        Extended sub_kind | fwd  -> worker False (getForwardKind sub_kind)
         Extended sub_kind -> worker False sub_kind
+
+getForwardKind :: (Migrate (Reverse a)) => Kind a -> Kind (MigrateFrom (Reverse a))
+getForwardKind _ = kind
 
 -- Extend chains must end in a Base kind. Ending in a Primitive is an error.
 validChain :: SafeCopy a => Proxy a -> Bool

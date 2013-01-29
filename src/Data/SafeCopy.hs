@@ -73,7 +73,8 @@ module Data.SafeCopy
     (
       safeGet
     , safePut
-    , SafeCopy(version, kind, getCopy, putCopy, errorTypeName)
+    , SafeCopy(version, kind, getCopy, putCopy, objectProfile, errorTypeName)
+    , Profile(..)
     , Prim(..)
     , Migrate(..)
     , Reverse(..)
