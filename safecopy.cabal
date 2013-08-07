@@ -43,8 +43,8 @@ Build-type:          Simple
 Cabal-version:       >=1.6
 
 Source-repository head
-  type:          darcs
-  location:      http://hub.darcs.net/Lemmih/safecopy
+  type:          git
+  location:      git://github.com/acid-state/safecopy.git
 
 
 Library
