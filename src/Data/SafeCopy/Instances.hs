@@ -348,8 +348,8 @@ instance SafeCopy CalendarTime where
                              pico   <- get
                              wday   <- safeGet
                              yday   <- get
-                             tzname <- get
-                             tz     <- safeGet
+                             tzname <- safeGet
+                             tz     <- get
                              dst    <- get
                              return (CalendarTime year month day hour mins sec pico wday yday tzname tz dst)
     putCopy t = contain $ do put     (ctYear t)
