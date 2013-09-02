@@ -73,6 +73,7 @@ Test-suite instances
   Type:                exitcode-stdio-1.0
   Main-is:             instances.hs
   Hs-Source-Dirs:      test/
-  GHC-Options:         -Wall
+  GHC-Options:         -Wall -threaded -rtsopts -with-rtsopts=-N
   Build-depends:       base, cereal, template-haskell, safecopy,
+                       containers, time, array, lens, pretty,
                        tasty, tasty-quickcheck, quickcheck-instances
