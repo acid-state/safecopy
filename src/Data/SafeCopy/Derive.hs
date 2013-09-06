@@ -21,7 +21,7 @@ import Data.SafeCopy.SafeCopy
 #if MIN_VERSION_template_haskell(2,8,0)
 import Language.Haskell.TH hiding (Kind)
 #else
-import Language.Haskell.TH
+import Language.Haskell.TH hiding (Kind(..))
 #endif
 import Control.Applicative
 import Control.Monad
