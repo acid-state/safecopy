@@ -16,11 +16,10 @@ import Data.Serialize (runPut, runGet)
 import Data.Time (UniversalTime(..), ZonedTime(..))
 import Data.Tree (Tree)
 import Language.Haskell.TH
-import Language.Haskell.TH.PprLib
+import Language.Haskell.TH.Syntax
 import Test.QuickCheck.Instances ()
 import Test.Tasty
 import Test.Tasty.QuickCheck hiding (Fixed)
-import Text.PrettyPrint
 
 instance (Arbitrary a, Arbitrary b, Arbitrary c, Arbitrary d, Arbitrary e, Arbitrary f) =>
          Arbitrary (a,b,c,d,e,f) where
@@ -96,13 +95,11 @@ do let a = conT ''Int
        downsize typ | typ `elem` downsized = [| mapSize (`div` 5) |]
                     | otherwise            = [| id |]
 
-       renderOneLine = renderStyle style { mode = OneLineMode }
-       name = renderOneLine . to_HPJ_Doc . ppr
-       shorten s | length s > 69 = take 69 s ++ "…"
-                 | otherwise     = s
+       unqualifying (Name occ _) = Name occ NameS
+       name = pprint . transformOnOf template template unqualifying
 
        prop typ =
-           [| testProperty $(litE . stringL . shorten $ name typ)
+           [| testProperty $(litE . stringL $ name typ)
                ($(downsize typ) (prop_inverse :: $(return typ) -> Property)) |]
 
        props = listE . map prop
