@@ -1,4 +1,10 @@
 {-# LANGUAGE TemplateHaskell, CPP #-}
+
+-- Hack for bug in older Cabal versions
+#ifndef MIN_VERSION_template_haskell
+#define MIN_VERSION_template_haskell(x,y,z) 1
+#endif
+
 module Data.SafeCopy.Derive
     (
       deriveSafeCopy
@@ -12,7 +18,11 @@ module Data.SafeCopy.Derive
 import Data.Serialize (getWord8, putWord8, label)
 import Data.SafeCopy.SafeCopy
 
-import Language.Haskell.TH hiding (Kind(..))
+#if MIN_VERSION_template_haskell(2,8,0)
+import Language.Haskell.TH hiding (Kind)
+#else
+import Language.Haskell.TH
+#endif
 import Control.Applicative
 import Control.Monad
 import Data.Maybe (fromMaybe)
