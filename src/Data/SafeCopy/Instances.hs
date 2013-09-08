@@ -35,6 +35,11 @@ import           Data.Typeable
 import           Data.Word
 import           System.Time (ClockTime(..), TimeDiff(..), CalendarTime(..), Month(..))
 import qualified System.Time as OT
+import qualified Data.Vector as V
+import qualified Data.Vector.Generic as VG
+import qualified Data.Vector.Primitive as VP
+import qualified Data.Vector.Storable as VS
+import qualified Data.Vector.Unboxed as VU
 
 instance SafeCopy a => SafeCopy (Prim a) where
   kind = primitive
@@ -373,3 +378,27 @@ typeName1 proxy = show (typeOf1 (undefined `asProxyType` proxy))
 
 typeName2 :: (Typeable2 c) => Proxy (c a b) -> String
 typeName2 proxy = show (typeOf2 (undefined `asProxyType` proxy))
+
+getGenericVector :: (SafeCopy a, VG.Vector v a) => Contained (Get (v a))
+getGenericVector = contain $ do n <- get
+                                getSafeGet >>= VG.replicateM n
+
+putGenericVector :: (SafeCopy a, VG.Vector v a) => v a -> Contained Put
+putGenericVector v = contain $ do put (VG.length v)
+                                  getSafePut >>= VG.forM_ v
+
+instance SafeCopy a => SafeCopy (V.Vector a) where
+    getCopy = getGenericVector
+    putCopy = putGenericVector
+
+instance (SafeCopy a, VP.Prim a) => SafeCopy (VP.Vector a) where
+    getCopy = getGenericVector
+    putCopy = putGenericVector
+
+instance (SafeCopy a, VS.Storable a) => SafeCopy (VS.Vector a) where
+    getCopy = getGenericVector
+    putCopy = putGenericVector
+
+instance (SafeCopy a, VU.Unbox a) => SafeCopy (VU.Vector a) where
+    getCopy = getGenericVector
+    putCopy = putGenericVector
