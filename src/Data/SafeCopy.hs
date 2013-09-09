@@ -1,3 +1,8 @@
+{-# LANGUAGE CPP #-}
+#ifdef SAFE_HASKELL
+{-# LANGUAGE Trustworthy #-}
+#endif
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.SafeCopy
