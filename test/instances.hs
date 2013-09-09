@@ -128,7 +128,7 @@ do let a = conT ''Int
 
 #if !MIN_VERSION_template_haskell(2,8,0)
        -- 'report' throws warnings in template-haskell-2.8.0.0
-       let reportWarning = report False
+       reportWarning = report False
 #endif
 
    mapM_ (\typ -> reportWarning $ "not tested: " ++ name typ) untested
