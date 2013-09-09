@@ -78,5 +78,5 @@ Test-suite instances
   Hs-Source-Dirs:      test/
   GHC-Options:         -Wall -threaded -rtsopts -with-rtsopts=-N
   Build-depends:       base, cereal, template-haskell, safecopy,
-                       containers, time, array, lens,
+                       containers, time, array, vector, lens,
                        tasty, tasty-quickcheck, quickcheck-instances

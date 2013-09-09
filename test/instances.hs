@@ -20,6 +20,10 @@ import Language.Haskell.TH.Syntax
 import Test.QuickCheck.Instances ()
 import Test.Tasty
 import Test.Tasty.QuickCheck hiding (Fixed)
+import qualified Data.Vector as V
+import qualified Data.Vector.Primitive as VP
+import qualified Data.Vector.Storable as VS
+import qualified Data.Vector.Unboxed as VU
 
 instance (Arbitrary a, Arbitrary b, Arbitrary c, Arbitrary d, Arbitrary e, Arbitrary f) =>
          Arbitrary (a,b,c,d,e,f) where
@@ -30,6 +34,18 @@ instance (Arbitrary a, Arbitrary b, Arbitrary c, Arbitrary d, Arbitrary e, Arbit
          Arbitrary (a,b,c,d,e,f,g) where
    arbitrary = (,,,,,,) <$> arbitrary <*> arbitrary <*> arbitrary <*>
                             arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
+
+instance (Arbitrary a) => Arbitrary (V.Vector a) where
+   arbitrary = V.fromList <$> arbitrary
+
+instance (Arbitrary a, VP.Prim a) => Arbitrary (VP.Vector a) where
+   arbitrary = VP.fromList <$> arbitrary
+
+instance (Arbitrary a, VS.Storable a) => Arbitrary (VS.Vector a) where
+   arbitrary = VS.fromList <$> arbitrary
+
+instance (Arbitrary a, VU.Unbox a) => Arbitrary (VU.Vector a) where
+   arbitrary = VU.fromList <$> arbitrary
 
 deriving instance (Arbitrary a) => Arbitrary (Prim a)
 deriving instance (Eq a) => Eq (Prim a)
