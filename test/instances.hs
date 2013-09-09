@@ -31,12 +31,6 @@ import qualified Data.Vector.Primitive as VP
 import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Unboxed as VU
 
--- New in template-haskell-2.8.0.0, where 'report' throws deprecation warnings.
-#if !MIN_VERSION_template_haskell(2,8,0)
-reportWarning :: String -> Q ()
-reportWarning = report False
-#endif
-
 instance (Arbitrary a, Arbitrary b, Arbitrary c, Arbitrary d, Arbitrary e, Arbitrary f) =>
          Arbitrary (a,b,c,d,e,f) where
    arbitrary = (,,,,,) <$> arbitrary <*> arbitrary <*> arbitrary <*>
@@ -131,6 +125,11 @@ do let a = conT ''Int
                ($(downsize typ) (prop_inverse :: $(return typ) -> Property)) |]
 
        props = listE . map prop
+
+#if !MIN_VERSION_template_haskell(2,8,0)
+       -- 'report' throws warnings in template-haskell-2.8.0.0
+       let reportWarning = report False
+#endif
 
    mapM_ (\typ -> reportWarning $ "not tested: " ++ name typ) untested
 
