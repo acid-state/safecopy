@@ -1,8 +1,14 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+
+-- Hack for bug in older Cabal versions
+#ifndef MIN_VERSION_template_haskell
+#define MIN_VERSION_template_haskell(x,y,z) 1
+#endif
 
 import Control.Applicative
 import Control.Lens
@@ -24,6 +30,12 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Primitive as VP
 import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Unboxed as VU
+
+-- New in template-haskell-2.8.0.0, where 'report' throws deprecation warnings.
+#if !MIN_VERSION_template_haskell(2,8,0)
+reportWarning :: String -> Q ()
+reportWarning = report False
+#endif
 
 instance (Arbitrary a, Arbitrary b, Arbitrary c, Arbitrary d, Arbitrary e, Arbitrary f) =>
          Arbitrary (a,b,c,d,e,f) where
