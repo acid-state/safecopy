@@ -8,6 +8,8 @@ import           Control.Applicative
 import           Control.Monad
 import qualified Data.Array as Array
 import qualified Data.Array.Unboxed as UArray
+import qualified Data.HashMap.Strict as HS
+import Data.Hashable
 import qualified Data.Array.IArray as IArray
 import qualified Data.ByteString.Lazy.Char8 as L
 import qualified Data.ByteString.Char8 as B
@@ -402,3 +404,8 @@ instance (SafeCopy a, VS.Storable a) => SafeCopy (VS.Vector a) where
 instance (SafeCopy a, VU.Unbox a) => SafeCopy (VU.Vector a) where
     getCopy = getGenericVector
     putCopy = putGenericVector
+
+instance (SafeCopy a, SafeCopy b, Eq a, Hashable a) =>
+    SafeCopy (HS.HashMap a b) where
+      getCopy = contain $ fmap HS.fromList safeGet
+      putCopy = contain . safePut . HS.toList
