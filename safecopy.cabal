@@ -7,7 +7,7 @@ Name:                safecopy
 -- The package version. See the Haskell package versioning policy
 -- (http://www.haskell.org/haskellwiki/Package_versioning_policy) for
 -- standards guiding when and how versions should be incremented.
-Version:             0.8.3
+Version:             0.8.4
 
 -- A short (one-line) description of the package.
 Synopsis:            Binary serialization with version control.
@@ -55,8 +55,9 @@ Library
 
   -- Packages needed in order to build this package.
   Build-depends:       base >=4 && <5, array, cereal >= 0.3.1.0, bytestring, containers >= 0.3,
-                       old-time, template-haskell, text, time, vector == 0.10.*
-
+                       old-time, template-haskell, text, time, unordered-containers >= 0.2.3.0,
+                       vector == 0.10.*, hashable >= 1.1.2.5
+                       
   -- Modules not exported by this package.
   Other-modules:       Data.SafeCopy.Instances, Data.SafeCopy.SafeCopy,
                        Data.SafeCopy.Derive
