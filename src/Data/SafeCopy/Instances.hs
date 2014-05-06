@@ -31,7 +31,7 @@ import           Data.Time.Clock (DiffTime, NominalDiffTime, UniversalTime(..), 
 import           Data.Time.Clock.TAI (AbsoluteTime, taiEpoch, addAbsoluteTime, diffAbsoluteTime)
 import           Data.Time.LocalTime (LocalTime(..), TimeOfDay(..), TimeZone(..), ZonedTime(..))
 import qualified Data.Tree as Tree
-import           Data.Typeable
+import           Data.Typeable hiding (Proxy)
 import           Data.Word
 import           System.Time (ClockTime(..), TimeDiff(..), CalendarTime(..), Month(..))
 import qualified System.Time as OT
