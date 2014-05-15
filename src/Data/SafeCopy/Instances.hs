@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts, UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Data.SafeCopy.Instances where
@@ -31,7 +32,11 @@ import           Data.Time.Clock (DiffTime, NominalDiffTime, UniversalTime(..), 
 import           Data.Time.Clock.TAI (AbsoluteTime, taiEpoch, addAbsoluteTime, diffAbsoluteTime)
 import           Data.Time.LocalTime (LocalTime(..), TimeOfDay(..), TimeZone(..), ZonedTime(..))
 import qualified Data.Tree as Tree
+#if MIN_VERSION_base(4,7,0)
+import           Data.Typeable hiding (Proxy)
+#else
 import           Data.Typeable
+#endif
 import           Data.Word
 import           System.Time (ClockTime(..), TimeDiff(..), CalendarTime(..), Month(..))
 import qualified System.Time as OT

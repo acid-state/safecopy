@@ -25,7 +25,7 @@ import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 import Test.QuickCheck.Instances ()
 import Test.Tasty
-import Test.Tasty.QuickCheck hiding (Fixed)
+import Test.Tasty.QuickCheck hiding (Fixed, (===))
 import qualified Data.Vector as V
 import qualified Data.Vector.Primitive as VP
 import qualified Data.Vector.Storable as VS
