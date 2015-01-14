@@ -256,7 +256,12 @@ internalDeriveSafeCopy deriveType versionId kindName tyName = do
     worker = worker' (conT tyName)
     worker' tyBase context tyvars cons =
       let ty = foldl appT tyBase [ varT var | PlainTV var <- tyvars ]
-      in (:[]) <$> instanceD (cxt $ [classP ''SafeCopy [varT var] | PlainTV var <- tyvars] ++ map return context)
+#if MIN_VERSION_template_haskell(2,10,0)
+          safeCopyClass args = foldl appT (conT ''SafeCopy) args
+#else
+          safeCopyClass args = classP ''SafeCopy args
+#endif
+      in (:[]) <$> instanceD (cxt $ [safeCopyClass [varT var] | PlainTV var <- tyvars] ++ map return context)
                                        (conT ''SafeCopy `appT` ty)
                                        [ mkPutCopy deriveType cons
                                        , mkGetCopy deriveType (show tyName) cons
@@ -290,7 +295,12 @@ internalDeriveSafeCopyIndexedType deriveType versionId kindName tyName tyIndex' 
     typeNameStr = unwords $ map show (tyName:tyIndex')
     worker' tyBase context tyvars cons =
       let ty = foldl appT tyBase [ varT var | PlainTV var <- tyvars ]
-      in (:[]) <$> instanceD (cxt $ [classP ''SafeCopy [varT var] | PlainTV var <- tyvars] ++ map return context)
+#if MIN_VERSION_template_haskell(2,10,0)
+          safeCopyClass args = foldl appT (conT ''SafeCopy) args
+#else
+          safeCopyClass args = classP ''SafeCopy args
+#endif
+      in (:[]) <$> instanceD (cxt $ [safeCopyClass [varT var] | PlainTV var <- tyvars] ++ map return context)
                                        (conT ''SafeCopy `appT` ty)
                                        [ mkPutCopy deriveType cons
                                        , mkGetCopy deriveType typeNameStr cons
