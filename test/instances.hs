@@ -12,6 +12,7 @@
 
 import Control.Applicative
 import Control.Lens
+import Control.Lens.Action
 import Data.Array (Array)
 import Data.Array.Unboxed (UArray)
 import Data.Data.Lens
