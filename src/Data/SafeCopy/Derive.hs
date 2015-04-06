@@ -375,6 +375,10 @@ mkSafeFunctions name baseFun con = do let origTypes = conTypes con
                                return ( bindS (varP funVar) (varE baseFun) : ds
                                       , (t, funVar) : fs )
               where found = any ((== t) . fst) fs
+          finish
+            :: [(Type, Type)]            -- "dictionary" from synonyms(or not) to real types
+            -> ([StmtQ], [(Type, Name)]) -- statements
+            -> ([StmtQ], Type -> Name)   -- function body and name-generator
           finish typeList (ds, fs) = (reverse ds, getName)
               where getName typ = fromMaybe err $ lookup typ typeList >>= flip lookup fs
                     err = error "mkSafeFunctions: never here"
