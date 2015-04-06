@@ -419,7 +419,7 @@ conTypes _                          = error "conName: never here"
 typeName :: Type -> String
 typeName (VarT name) = nameBase name
 typeName (ConT name) = nameBase name
-typeName (TupleT n)  = '(' : replicate (n-1) ',' ++ ")"
+typeName (TupleT n)  = "Tuple" ++ show n
 typeName ArrowT      = "Arrow"
 typeName ListT       = "List"
 typeName (AppT t u)  = typeName t ++ typeName u
