@@ -382,7 +382,6 @@ mkSafeFunctions name baseFun con = do let origTypes = conTypes con
           finish typeList (ds, fs) = (reverse ds, getName)
               where getName typ = fromMaybe err $ lookup typ typeList >>= flip lookup fs
                     err = error "mkSafeFunctions: never here"
-    -- We can't use a Data.Map because Type isn't a member of Ord =/...
 
 -- | Follow type synonyms.  This allows us to see, for example,
 -- that @[Char]@ and @String@ are the same type and we just need
