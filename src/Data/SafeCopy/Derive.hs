@@ -375,10 +375,13 @@ mkSafeFunctions name baseFun con = do let origTypes = conTypes con
                                return ( bindS (varP funVar) (varE baseFun) : ds
                                       , (t, funVar) : fs )
               where found = any ((== t) . fst) fs
+          finish
+            :: [(Type, Type)]            -- "dictionary" from synonyms(or not) to real types
+            -> ([StmtQ], [(Type, Name)]) -- statements
+            -> ([StmtQ], Type -> Name)   -- function body and name-generator
           finish typeList (ds, fs) = (reverse ds, getName)
               where getName typ = fromMaybe err $ lookup typ typeList >>= flip lookup fs
                     err = error "mkSafeFunctions: never here"
-    -- We can't use a Data.Map because Type isn't a member of Ord =/...
 
 -- | Follow type synonyms.  This allows us to see, for example,
 -- that @[Char]@ and @String@ are the same type and we just need
@@ -416,7 +419,7 @@ conTypes _                          = error "conName: never here"
 typeName :: Type -> String
 typeName (VarT name) = nameBase name
 typeName (ConT name) = nameBase name
-typeName (TupleT n)  = '(' : replicate (n-1) ',' ++ ")"
+typeName (TupleT n)  = "Tuple" ++ show n
 typeName ArrowT      = "Arrow"
 typeName ListT       = "List"
 typeName (AppT t u)  = typeName t ++ typeName u
