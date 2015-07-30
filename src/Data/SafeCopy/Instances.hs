@@ -55,15 +55,18 @@ instance SafeCopy a => SafeCopy (Prim a) where
     = contain $ unsafeUnPack (putCopy e)
 
 instance SafeCopy a => SafeCopy [a] where
-    getCopy = contain $
-              do n <- get
-                 getSafeGet >>= replicateM n
-    putCopy lst
-        = contain $
-          do put (length lst)
-             getSafePut >>= forM_ lst
-
-    errorTypeName = typeName1
+  getCopy = contain $ do
+    n <- get
+    g <- getSafeGet
+    go g [] n
+      where
+        go :: Get a -> [a] -> Int -> Get [a]
+        go _ as 0 = return (reverse as)
+        go g as i = do x <- g
+                       x `seq` go g (x:as) (i - 1)
+  putCopy lst = contain $ do put (length lst)
+                             getSafePut >>= forM_ lst
+  errorTypeName = typeName1
 
 instance SafeCopy a => SafeCopy (Maybe a) where
     getCopy = contain $ do n <- get
