@@ -23,7 +23,9 @@ import Language.Haskell.TH hiding (Kind)
 #else
 import Language.Haskell.TH hiding (Kind(..))
 #endif
+#if !MIN_VERSION_base(4,8,0)
 import Control.Applicative
+#endif
 import Control.Monad
 import Data.Maybe (fromMaybe)
 #ifdef __HADDOCK__
