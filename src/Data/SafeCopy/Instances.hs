@@ -16,6 +16,9 @@ import qualified Data.ByteString.Lazy.Char8 as L
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Foldable as Foldable
 import           Data.Fixed (HasResolution, Fixed)
+import           Data.Hashable
+import qualified Data.HashMap.Lazy as HashMap
+import qualified Data.HashSet as HashSet
 import           Data.Int
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
@@ -87,6 +90,16 @@ instance (SafeCopy a, SafeCopy b, Ord a) => SafeCopy (Map.Map a b) where
     getCopy = contain $ fmap Map.fromDistinctAscList safeGet
     putCopy = contain . safePut . Map.toAscList
     errorTypeName = typeName2
+
+instance (Eq a, Hashable a, SafeCopy a, SafeCopy b) => SafeCopy (HashMap.HashMap a b) where
+    getCopy = contain $ fmap HashMap.fromList safeGet
+    putCopy = contain . safePut . HashMap.toList
+    errorTypeName = typeName2
+
+instance (Eq a, Hashable a, SafeCopy a) => SafeCopy (HashSet.HashSet a) where
+    getCopy = contain $ fmap HashSet.fromList safeGet
+    putCopy = contain . safePut . HashSet.toList
+    errorTypeName = typeName1
 
 instance (SafeCopy a) => SafeCopy (IntMap.IntMap a) where
     getCopy = contain $ fmap IntMap.fromDistinctAscList safeGet
