@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleContexts, UndecidableInstances #-}
+{-# LANGUAGE FlexibleContexts, UndecidableInstances, TypeFamilies #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Data.SafeCopy.Instances where
 
@@ -163,10 +163,50 @@ instance SafeCopy Int where
     getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
 instance SafeCopy Integer where
     getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
+
+-- | cereal change the formats for Float/Double in 0.5.*
+--
+-- https://github.com/GaloisInc/cereal/commit/47d839609413e3e9d1147b99c34ae421ae36bced
+-- https://github.com/GaloisInc/cereal/issues/35
+newtype CerealFloat040 = CerealFloat040 { unCerealFloat040 :: Float} deriving Show
+instance SafeCopy CerealFloat040 where
+    getCopy = contain (CerealFloat040 <$> liftM2 encodeFloat get get)
+    putCopy (CerealFloat040 float) = contain (put (decodeFloat float))
+    errorTypeName = typeName
+
+instance Migrate Float where
+  type MigrateFrom Float = CerealFloat040
+  migrate (CerealFloat040 d) = d
+
 instance SafeCopy Float where
-    getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
+  version = Version 1
+  kind = extension
+  getCopy = contain get
+  putCopy = contain . put
+  errorTypeName = typeName
+
+-- | cereal change the formats for Float/Double in 0.5.*
+--
+-- https://github.com/GaloisInc/cereal/commit/47d839609413e3e9d1147b99c34ae421ae36bced
+-- https://github.com/GaloisInc/cereal/issues/35
+newtype CerealDouble040 = CerealDouble040 { unCerealDouble040 :: Double} deriving Show
+instance SafeCopy CerealDouble040 where
+    getCopy = contain (CerealDouble040 <$> liftM2 encodeFloat get get)
+    putCopy (CerealDouble040 double) = contain (put (decodeFloat double))
+    errorTypeName = typeName
+
+instance Migrate Double where
+  type MigrateFrom Double = CerealDouble040
+  migrate (CerealDouble040 d) = d
+
 instance SafeCopy Double where
-    getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
+  version = Version 1
+  kind = extension
+  getCopy = contain get
+  putCopy = contain . put
+  errorTypeName = typeName
+
+
 instance SafeCopy L.ByteString where
     getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
 instance SafeCopy B.ByteString where
