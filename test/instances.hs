@@ -99,7 +99,18 @@ do let a = conT ''Int
 
    safecopy <- reify ''SafeCopy
    preds <- 'prop_inverse ^!! act reify . (template :: Traversal' Info Pred)
+#if !MIN_VERSION_template_haskell(2,10,0)
    classes <- mapM reify [ name | ClassP name _ <- preds ]
+#else
+--   print preds
+
+   classes <-
+         case preds of
+           [ForallT _ cxt' _] ->
+              mapM reify [ name | AppT (ConT name) _ <- cxt' ]
+           _ -> error "FIXME: fix this code to handle this case."
+--   classes <- mapM reify [ ]
+#endif
    def <- a
 
    let instances (ClassI _ decs) = [ typ | InstanceD _ (AppT _ typ) _ <- decs ]
