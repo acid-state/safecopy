@@ -7,7 +7,7 @@ Name:                safecopy
 -- The package version. See the Haskell package versioning policy
 -- (http://www.haskell.org/haskellwiki/Package_versioning_policy) for
 -- standards guiding when and how versions should be incremented.
-Version:             0.9.0
+Version:             0.9.0.1
 
 -- A short (one-line) description of the package.
 Synopsis:            Binary serialization with version control.
@@ -37,7 +37,7 @@ Build-type:          Simple
 
 -- Extra files to be distributed with the package, such as examples or
 -- a README.
--- Extra-source-files:
+Extra-source-files: CHANGELOG.md
 
 -- Constraint on the version of Cabal needed to build this package.
 Cabal-version:       >=1.8
