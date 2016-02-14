@@ -87,4 +87,4 @@ Test-suite instances
   GHC-Options:         -Wall -threaded -rtsopts -with-rtsopts=-N
   Build-depends:       base, cereal, template-haskell, safecopy,
                        containers, time, array, vector, lens >= 4.7 && < 5.0,
-                       lens-action, tasty, tasty-quickcheck, quickcheck-instances
+                       lens-action, tasty, tasty-quickcheck, quickcheck-instances, QuickCheck
