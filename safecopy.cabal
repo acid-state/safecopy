@@ -63,7 +63,7 @@ Library
                        old-time < 1.2,
                        template-haskell < 2.12,
                        text < 1.3,
-                       time < 1.6,
+                       time < 1.7,
                        vector >= 0.10 && < 0.12
 
   -- Modules not exported by this package.
