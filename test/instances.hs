@@ -42,6 +42,7 @@ instance (Arbitrary a, Arbitrary b, Arbitrary c, Arbitrary d, Arbitrary e, Arbit
    arbitrary = (,,,,,,) <$> arbitrary <*> arbitrary <*> arbitrary <*>
                             arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
 
+#if ! MIN_VERSION_QuickCheck(2,8,2)
 instance (Arbitrary a) => Arbitrary (V.Vector a) where
    arbitrary = V.fromList <$> arbitrary
 
@@ -53,6 +54,7 @@ instance (Arbitrary a, VS.Storable a) => Arbitrary (VS.Vector a) where
 
 instance (Arbitrary a, VU.Unbox a) => Arbitrary (VU.Vector a) where
    arbitrary = VU.fromList <$> arbitrary
+#endif
 
 deriving instance (Arbitrary a) => Arbitrary (Prim a)
 deriving instance (Eq a) => Eq (Prim a)
