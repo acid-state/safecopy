@@ -213,6 +213,8 @@ instance SafeCopy B.ByteString where
     getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
 instance SafeCopy Char where
     getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
+instance SafeCopy Word where
+    getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
 instance SafeCopy Word8 where
     getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
 instance SafeCopy Word16 where
