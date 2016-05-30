@@ -1,3 +1,11 @@
+0.9.1
+=====
+
+ - fixed tests to work with QuickCheck-2.8.2
+ - add SafeCopy instance for Word
+ - updates for template-haskell 2.11
+ - export some internal TH derivation helpers
+
 0.9.0
 =====
 
