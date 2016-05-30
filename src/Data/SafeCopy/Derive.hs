@@ -5,15 +5,7 @@
 #define MIN_VERSION_template_haskell(x,y,z) 1
 #endif
 
-module Data.SafeCopy.Derive
-    (
-      deriveSafeCopy
-    , deriveSafeCopyIndexedType
-    , deriveSafeCopySimple
-    , deriveSafeCopySimpleIndexedType
-    , deriveSafeCopyHappstackData
-    , deriveSafeCopyHappstackDataIndexedType
-    ) where
+module Data.SafeCopy.Derive where
 
 import Data.Serialize (getWord8, putWord8, label)
 import Data.SafeCopy.SafeCopy
@@ -243,6 +235,10 @@ tyVarName (KindedTV n _) = n
 internalDeriveSafeCopy :: DeriveType -> Version a -> Name -> Name -> Q [Dec]
 internalDeriveSafeCopy deriveType versionId kindName tyName = do
   info <- reify tyName
+  internalDeriveSafeCopy' deriveType versionId kindName tyName info
+
+internalDeriveSafeCopy' :: DeriveType -> Version a -> Name -> Name -> Info -> Q [Dec]
+internalDeriveSafeCopy' deriveType versionId kindName tyName info = do
   case info of
 #if MIN_VERSION_template_haskell(2,11,0)
     TyConI (DataD context _name tyvars _kind cons _derivs)
@@ -299,8 +295,12 @@ internalDeriveSafeCopy deriveType versionId kindName tyName = do
 
 internalDeriveSafeCopyIndexedType :: DeriveType -> Version a -> Name -> Name -> [Name] -> Q [Dec]
 internalDeriveSafeCopyIndexedType deriveType versionId kindName tyName tyIndex' = do
-  tyIndex <- mapM conT tyIndex'
   info <- reify tyName
+  internalDeriveSafeCopyIndexedType' deriveType versionId kindName tyName tyIndex' info
+
+internalDeriveSafeCopyIndexedType' :: DeriveType -> Version a -> Name -> Name -> [Name] -> Info -> Q [Dec]
+internalDeriveSafeCopyIndexedType' deriveType versionId kindName tyName tyIndex' info = do
+  tyIndex <- mapM conT tyIndex'
   case info of
     FamilyI _ insts -> do
       decs <- forM insts $ \inst ->

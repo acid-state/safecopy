@@ -50,6 +50,7 @@ Source-repository head
 Library
   -- Modules exported by the library.
   Exposed-modules:     Data.SafeCopy
+                       Data.SafeCopy.Internal
 
   Hs-Source-Dirs:      src/
 
