@@ -3,44 +3,19 @@
 -- http://www.haskell.org/cabal/release/cabal-latest/doc/users-guide/authors.html#pkg-descr.
 -- The name of the package.
 Name:                safecopy
-
--- The package version. See the Haskell package versioning policy
--- (http://www.haskell.org/haskellwiki/Package_versioning_policy) for
--- standards guiding when and how versions should be incremented.
 Version:             0.9.0.1
-
--- A short (one-line) description of the package.
 Synopsis:            Binary serialization with version control.
-
--- A longer description of the package.
 Description:         An extension to Data.Serialize with built-in version control.
-
--- URL for the project homepage or repository.
 Homepage:            http://acid-state.seize.it/safecopy
-
--- The license under which the package is released.
 License:             PublicDomain
-
--- The package author(s).
 Author:              David Himmelstrup, Felipe Lessa
-
--- An email address to which users can send suggestions, bug reports,
--- and patches.
 Maintainer:          Lemmih <lemmih@gmail.com>
-
--- A copyright notice.
 -- Copyright:
-
 Category:            Data, Parsing
-
 Build-type:          Simple
-
--- Extra files to be distributed with the package, such as examples or
--- a README.
 Extra-source-files: CHANGELOG.md
-
--- Constraint on the version of Cabal needed to build this package.
 Cabal-version:       >=1.8
+tested-with:         GHC == 7.6.3, GHC == 7.8.4, GHC == 7.10.2, GHC==8.0.1
 
 Source-repository head
   type:          git
