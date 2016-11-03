@@ -32,6 +32,7 @@ import qualified Data.Vector.Primitive as VP
 import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Unboxed as VU
 
+#if ! MIN_VERSION_QuickCheck(2,9,0)
 instance (Arbitrary a, Arbitrary b, Arbitrary c, Arbitrary d, Arbitrary e, Arbitrary f) =>
          Arbitrary (a,b,c,d,e,f) where
    arbitrary = (,,,,,) <$> arbitrary <*> arbitrary <*> arbitrary <*>
@@ -41,6 +42,7 @@ instance (Arbitrary a, Arbitrary b, Arbitrary c, Arbitrary d, Arbitrary e, Arbit
          Arbitrary (a,b,c,d,e,f,g) where
    arbitrary = (,,,,,,) <$> arbitrary <*> arbitrary <*> arbitrary <*>
                             arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
+#endif
 
 #if ! MIN_VERSION_QuickCheck(2,8,2)
 instance (Arbitrary a) => Arbitrary (V.Vector a) where
@@ -61,7 +63,9 @@ deriving instance (Eq a) => Eq (Prim a)
 deriving instance (Show a) => Show (Prim a)
 
 deriving instance Eq ZonedTime
+#if ! MIN_VERSION_time(1,6,0)
 deriving instance Show UniversalTime
+#endif
 
 -- | Equality on the 'Right' value, showing the unequal value on failure;
 -- or explicit failure using the 'Left' message without equality testing.
@@ -115,7 +119,11 @@ do let a = conT ''Int
 #endif
    def <- a
 
+#if MIN_VERSION_template_haskell(2,11,0)
+   let instances (ClassI _ decs) = [ typ | InstanceD _ _ (AppT _ typ) _ <- decs ]
+#else
    let instances (ClassI _ decs) = [ typ | InstanceD _ (AppT _ typ) _ <- decs ]
+#endif
        instances _ = []
        types = map instances classes
 
