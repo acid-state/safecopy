@@ -6,7 +6,7 @@ Name:                safecopy
 Version:             0.9.1
 Synopsis:            Binary serialization with version control.
 Description:         An extension to Data.Serialize with built-in version control.
-Homepage:            http://acid-state.seize.it/safecopy
+Homepage:            https://github.com/acid-state/safecopy
 License:             PublicDomain
 Author:              David Himmelstrup, Felipe Lessa
 Maintainer:          Lemmih <lemmih@gmail.com>
