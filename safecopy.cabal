@@ -39,7 +39,7 @@ Library
                        template-haskell < 2.12,
                        text < 1.3,
                        time < 1.7,
-                       vector >= 0.10 && < 0.12
+                       vector >= 0.10 && < 0.13
 
   -- Modules not exported by this package.
   Other-modules:       Data.SafeCopy.Instances, Data.SafeCopy.SafeCopy,
