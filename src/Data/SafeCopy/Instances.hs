@@ -20,6 +20,7 @@ import           Data.Int
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import           Data.Ix
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map as Map
 import           Data.Ratio (Ratio, (%), numerator, denominator)
 import qualified Data.Sequence as Sequence
@@ -69,6 +70,11 @@ instance SafeCopy a => SafeCopy [a] where
   putCopy lst = contain $ do put (length lst)
                              getSafePut >>= forM_ lst
   errorTypeName = typeName1
+
+instance SafeCopy a => SafeCopy (NonEmpty.NonEmpty a) where
+    getCopy = contain $ fmap NonEmpty.fromList safeGet
+    putCopy = contain . safePut . NonEmpty.toList
+    errorTypeName = typeName1
 
 instance SafeCopy a => SafeCopy (Maybe a) where
     getCopy = contain $ do n <- get

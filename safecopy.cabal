@@ -41,6 +41,9 @@ Library
                        time < 1.7,
                        vector >= 0.10 && < 0.13
 
+  if !impl(ghc > 8.0)
+    Build-Depends:     semigroups >= 0.18 && < 0.19
+
   -- Modules not exported by this package.
   Other-modules:       Data.SafeCopy.Instances, Data.SafeCopy.SafeCopy,
                        Data.SafeCopy.Derive
