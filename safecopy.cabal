@@ -39,7 +39,8 @@ Library
                        template-haskell < 2.12,
                        text < 1.3,
                        time < 1.7,
-                       vector >= 0.10 && < 0.12
+                       vector >= 0.10 && < 0.13
+
   if !impl(ghc > 8.0)
     Build-Depends:     semigroups >= 0.18 && < 0.19
 
