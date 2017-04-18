@@ -350,7 +350,7 @@ mkPutCopy deriveType cons = funD 'putCopy $ map mkPutClause cons
     where
       manyConstructors = length cons > 1 || forceTag deriveType
       mkPutClause (conNumber, con)
-          = do putVars <- replicateM (conSize con) (newName "arg")
+          = do putVars <- mapM (\n -> newName ("a" ++ show n)) [1..conSize con]
                (putFunsDecs, putFuns) <- case deriveType of
                                            Normal -> mkSafeFunctions "safePut_" 'getSafePut con
                                            _      -> return ([], const 'safePut)
