@@ -122,7 +122,7 @@ class SafeCopy a where
     -- message strings.
     -- Feel free to leave undefined in your instances.
     errorTypeName :: Proxy a -> String
-    errorTypeName _ = "<unkown type>"
+    errorTypeName _ = "<unknown type>"
 
 #ifdef DEFAULT_SIGNATURES
     default getCopy :: Serialize a => Contained (Get a)
