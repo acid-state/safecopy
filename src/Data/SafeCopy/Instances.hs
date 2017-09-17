@@ -431,10 +431,15 @@ instance SafeCopy CalendarTime where
 typeName :: Typeable a => Proxy a -> String
 typeName proxy = show (typeOf (undefined `asProxyType` proxy))
 
+#if MIN_VERSION_base(4,10,0)
+typeName1 :: (Typeable c) => Proxy (c a) -> String
+typeName2 :: (Typeable c) => Proxy (c a b) -> String
+#else
 typeName1 :: (Typeable1 c) => Proxy (c a) -> String
-typeName1 proxy = show (typeOf1 (undefined `asProxyType` proxy))
-
 typeName2 :: (Typeable2 c) => Proxy (c a b) -> String
+#endif
+
+typeName1 proxy = show (typeOf1 (undefined `asProxyType` proxy))
 typeName2 proxy = show (typeOf2 (undefined `asProxyType` proxy))
 
 getGenericVector :: (SafeCopy a, VG.Vector v a) => Contained (Get (v a))
