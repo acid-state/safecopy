@@ -212,8 +212,8 @@ getSafePut
                         return $ \a -> unsafeUnPack (putCopy $ asProxyType a proxy)
     where proxy = Proxy :: Proxy a
 
--- | The extended_base kind lets the system know that there is
---   at least one future version of this type.
+-- | The extended_extension kind lets the system know that there is
+--   at least one previous and one future version of this type.
 extended_extension :: (SafeCopy a, Migrate a, Migrate (Reverse a)) => Kind a
 extended_extension = Extended extension
 
