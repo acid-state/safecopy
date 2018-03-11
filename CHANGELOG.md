@@ -1,3 +1,9 @@
+0.9.4
+=====
+  - Support ghc-8.4.1
+  - Travis config for ghc-8.2.1
+  - SafeCopy instance for Data.List.NonEmpty.NonEmpty
+
 0.9.1
 =====
 
