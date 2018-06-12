@@ -136,37 +136,44 @@ class SafeCopy a where
 -- constructGetterFromVersion :: SafeCopy a => Version a -> Kind (MigrateFrom (Reverse a)) -> Get (Get a)
 constructGetterFromVersion :: SafeCopy a => Version a -> Kind a -> Either String (Get a)
 constructGetterFromVersion diskVersion orig_kind =
-  worker False diskVersion orig_kind
+  worker [] False diskVersion orig_kind
   where
-    worker :: forall a. SafeCopy a => Bool -> Version a -> Kind a -> Either String (Get a)
-    worker fwd thisVersion thisKind
+    worker :: forall a. SafeCopy a => [String] -> Bool -> Version a -> Kind a -> Either String (Get a)
+    worker prev fwd thisVersion thisKind
       | version == thisVersion = return $ unsafeUnPack getCopy
       | otherwise =
         case thisKind of
-          Primitive -> Left $ errorMsg thisKind "Cannot migrate from primitive types."
-          Base      -> Left $ errorMsg thisKind versionNotFound
+          Primitive -> Left $ errorMsg prev thisKind "Cannot migrate from primitive types."
+          Base      -> Left $ errorMsg prev thisKind versionNotFound
           Extends b_proxy -> do
-            previousGetter <- worker fwd (castVersion diskVersion) (kindFromProxy b_proxy)
+            previousGetter <- worker typs fwd (castVersion diskVersion) (kindFromProxy b_proxy)
             return $ fmap migrate previousGetter
-          Extended{} | fwd -> Left $ errorMsg thisKind versionNotFound
+          Extended{} | fwd -> Left $ errorMsg prev thisKind versionNotFound
           Extended a_kind -> do
             let rev_proxy :: Proxy (MigrateFrom (Reverse a))
                 rev_proxy = Proxy
                 forwardGetter :: Either String (Get a)
-                forwardGetter  = fmap (fmap (unReverse . migrate)) $ worker True (castVersion thisVersion) (kindFromProxy rev_proxy)
+                forwardGetter  = fmap (fmap (unReverse . migrate)) $ worker typs True (castVersion thisVersion) (kindFromProxy rev_proxy)
                 previousGetter :: Either String (Get a)
-                previousGetter = worker fwd (castVersion thisVersion) a_kind
+                previousGetter = worker typs fwd (castVersion thisVersion) a_kind
             case forwardGetter of
               Left{}    -> previousGetter
               Right val -> Right val
+      where
+        typs = showKind thisKind : prev
+
     versionNotFound   = "Cannot find getter associated with this version number: " ++ show diskVersion
-    errorMsg fail_kind msg =
+    errorMsg ctx fail_kind msg =
         concat
-         [ "safecopy: "
-         , errorTypeName (proxyFromKind fail_kind)
+         [ "safecopy: while constructing a getter for this type: "
+         , showKind fail_kind
          , ": "
          , msg
-         ]
+         ] ++ case ctx of
+             [] -> []
+             _ -> ". Context: " ++ intercalate " -> " (reverse ctx)
+
+    showKind k = errorTypeName (proxyFromKind k)
 
 -------------------------------------------------
 -- The public interface. These functions are used
