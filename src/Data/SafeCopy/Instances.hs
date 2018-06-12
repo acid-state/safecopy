@@ -49,7 +49,11 @@ import qualified Data.Vector.Primitive as VP
 import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Unboxed as VU
 
-instance SafeCopy a => SafeCopy (Prim a) where
+instance (
+#ifdef DEFAULT_SIGNATURES
+    Typeable a,
+#endif
+    SafeCopy a) => SafeCopy (Prim a) where
   kind = primitive
   getCopy = contain $
             do e <- unsafeUnPack getCopy
@@ -76,7 +80,11 @@ instance SafeCopy a => SafeCopy (NonEmpty.NonEmpty a) where
     putCopy = contain . safePut . NonEmpty.toList
     errorTypeName = typeName1
 
-instance SafeCopy a => SafeCopy (Maybe a) where
+instance (
+#ifdef DEFAULT_SIGNATURES
+    Typeable a,
+#endif
+    SafeCopy a) => SafeCopy (Maybe a) where
     getCopy = contain $ do n <- get
                            if n then liftM Just safeGet
                                 else return Nothing
@@ -84,17 +92,29 @@ instance SafeCopy a => SafeCopy (Maybe a) where
     putCopy Nothing = contain $ put False
     errorTypeName = typeName1
 
-instance (SafeCopy a, Ord a) => SafeCopy (Set.Set a) where
+instance (
+#ifdef DEFAULT_SIGNATURES
+    Typeable a,
+#endif
+    SafeCopy a, Ord a) => SafeCopy (Set.Set a) where
     getCopy = contain $ fmap Set.fromDistinctAscList safeGet
     putCopy = contain . safePut . Set.toAscList
     errorTypeName = typeName1
 
-instance (SafeCopy a, SafeCopy b, Ord a) => SafeCopy (Map.Map a b) where
+instance (
+#ifdef DEFAULT_SIGNATURES
+    Typeable a, Typeable b,
+#endif
+    SafeCopy a, SafeCopy b, Ord a) => SafeCopy (Map.Map a b) where
     getCopy = contain $ fmap Map.fromDistinctAscList safeGet
     putCopy = contain . safePut . Map.toAscList
     errorTypeName = typeName2
 
-instance (SafeCopy a) => SafeCopy (IntMap.IntMap a) where
+instance (
+#ifdef DEFAULT_SIGNATURES
+    Typeable a,
+#endif
+    SafeCopy a) => SafeCopy (IntMap.IntMap a) where
     getCopy = contain $ fmap IntMap.fromDistinctAscList safeGet
     putCopy = contain . safePut . IntMap.toAscList
     errorTypeName = typeName1
@@ -104,12 +124,20 @@ instance SafeCopy IntSet.IntSet where
     putCopy = contain . safePut . IntSet.toAscList
     errorTypeName = typeName
 
-instance (SafeCopy a) => SafeCopy (Sequence.Seq a) where
+instance (
+#ifdef DEFAULT_SIGNATURES
+    Typeable a,
+#endif
+    SafeCopy a) => SafeCopy (Sequence.Seq a) where
     getCopy = contain $ fmap Sequence.fromList safeGet
     putCopy = contain . safePut . Foldable.toList
     errorTypeName = typeName1
 
-instance (SafeCopy a) => SafeCopy (Tree.Tree a) where
+instance (
+#ifdef DEFAULT_SIGNATURES
+    Typeable a,
+#endif
+    SafeCopy a) => SafeCopy (Tree.Tree a) where
     getCopy = contain $ liftM2 Tree.Node safeGet safeGet
     putCopy (Tree.Node root sub) = contain $ safePut root >> safePut sub
     errorTypeName = typeName1
@@ -128,7 +156,7 @@ iarray_putCopy arr = contain $ do putIx <- getSafePut
                                   safePut (IArray.elems arr)
 {-# INLINE iarray_putCopy #-}
 
-instance (Ix i, SafeCopy e, SafeCopy i) => SafeCopy (Array.Array i e) where
+instance (Ix i, SafeCopy e, SafeCopy i, Typeable i, Typeable e) => SafeCopy (Array.Array i e) where
     getCopy = iarray_getCopy
     putCopy = iarray_putCopy
     errorTypeName = typeName2
@@ -138,26 +166,50 @@ instance (IArray.IArray UArray.UArray e, Ix i, SafeCopy e, SafeCopy i) => SafeCo
     putCopy = iarray_putCopy
     errorTypeName = typeName2
 
-instance (SafeCopy a, SafeCopy b) => SafeCopy (a,b) where
+instance (
+#ifdef DEFAULT_SIGNATURES
+    Typeable a, Typeable b,
+#endif
+    SafeCopy a, SafeCopy b) => SafeCopy (a,b) where
     getCopy = contain $ liftM2 (,) safeGet safeGet
     putCopy (a,b) = contain $ safePut a >> safePut b
     errorTypeName = typeName2
-instance (SafeCopy a, SafeCopy b, SafeCopy c) => SafeCopy (a,b,c) where
+instance (
+#ifdef DEFAULT_SIGNATURES
+    Typeable a, Typeable b, Typeable c,
+#endif
+    SafeCopy a, SafeCopy b, SafeCopy c) => SafeCopy (a,b,c) where
     getCopy = contain $ liftM3 (,,) safeGet safeGet safeGet
     putCopy (a,b,c) = contain $ safePut a >> safePut b >> safePut c
-instance (SafeCopy a, SafeCopy b, SafeCopy c, SafeCopy d) => SafeCopy (a,b,c,d) where
+instance (
+#ifdef DEFAULT_SIGNATURES
+    Typeable a, Typeable b, Typeable c, Typeable d,
+#endif
+    SafeCopy a, SafeCopy b, SafeCopy c, SafeCopy d) => SafeCopy (a,b,c,d) where
     getCopy = contain $ liftM4 (,,,) safeGet safeGet safeGet safeGet
     putCopy (a,b,c,d) = contain $ safePut a >> safePut b >> safePut c >> safePut d
-instance (SafeCopy a, SafeCopy b, SafeCopy c, SafeCopy d, SafeCopy e) =>
+instance (
+#ifdef DEFAULT_SIGNATURES
+    Typeable a, Typeable b, Typeable c, Typeable d, Typeable e,
+#endif
+    SafeCopy a, SafeCopy b, SafeCopy c, SafeCopy d, SafeCopy e) =>
          SafeCopy (a,b,c,d,e) where
     getCopy = contain $ liftM5 (,,,,) safeGet safeGet safeGet safeGet safeGet
     putCopy (a,b,c,d,e) = contain $ safePut a >> safePut b >> safePut c >> safePut d >> safePut e
-instance (SafeCopy a, SafeCopy b, SafeCopy c, SafeCopy d, SafeCopy e, SafeCopy f) =>
+instance (
+#ifdef DEFAULT_SIGNATURES
+    Typeable a, Typeable b, Typeable c, Typeable d, Typeable e, Typeable f,
+#endif
+    SafeCopy a, SafeCopy b, SafeCopy c, SafeCopy d, SafeCopy e, SafeCopy f) =>
          SafeCopy (a,b,c,d,e,f) where
     getCopy = contain $ (,,,,,) <$> safeGet <*> safeGet <*> safeGet <*> safeGet <*> safeGet <*> safeGet
     putCopy (a,b,c,d,e,f) = contain $ safePut a >> safePut b >> safePut c >> safePut d >>
                                       safePut e >> safePut f
-instance (SafeCopy a, SafeCopy b, SafeCopy c, SafeCopy d, SafeCopy e, SafeCopy f, SafeCopy g) =>
+instance (
+#ifdef DEFAULT_SIGNATURES
+    Typeable a, Typeable b, Typeable c, Typeable d, Typeable e, Typeable f, Typeable g,
+#endif
+    SafeCopy a, SafeCopy b, SafeCopy c, SafeCopy d, SafeCopy e, SafeCopy f, SafeCopy g) =>
          SafeCopy (a,b,c,d,e,f,g) where
     getCopy = contain $ (,,,,,,) <$> safeGet <*> safeGet <*> safeGet <*> safeGet <*>
                                      safeGet <*> safeGet <*> safeGet
@@ -450,18 +502,34 @@ putGenericVector :: (SafeCopy a, VG.Vector v a) => v a -> Contained Put
 putGenericVector v = contain $ do put (VG.length v)
                                   getSafePut >>= VG.forM_ v
 
-instance SafeCopy a => SafeCopy (V.Vector a) where
+instance (
+#ifdef DEFAULT_SIGNATURES
+    Typeable a,
+#endif
+    SafeCopy a) => SafeCopy (V.Vector a) where
     getCopy = getGenericVector
     putCopy = putGenericVector
 
-instance (SafeCopy a, VP.Prim a) => SafeCopy (VP.Vector a) where
+instance (
+#ifdef DEFAULT_SIGNATURES
+    Typeable a,
+#endif
+    SafeCopy a, VP.Prim a) => SafeCopy (VP.Vector a) where
     getCopy = getGenericVector
     putCopy = putGenericVector
 
-instance (SafeCopy a, VS.Storable a) => SafeCopy (VS.Vector a) where
+instance (
+#ifdef DEFAULT_SIGNATURES
+    Typeable a,
+#endif
+    SafeCopy a, VS.Storable a) => SafeCopy (VS.Vector a) where
     getCopy = getGenericVector
     putCopy = putGenericVector
 
-instance (SafeCopy a, VU.Unbox a) => SafeCopy (VU.Vector a) where
+instance (
+#ifdef DEFAULT_SIGNATURES
+    Typeable a,
+#endif
+    SafeCopy a, VU.Unbox a) => SafeCopy (VU.Vector a) where
     getCopy = getGenericVector
     putCopy = putGenericVector

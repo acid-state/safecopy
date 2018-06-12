@@ -27,6 +27,10 @@ import Control.Monad
 import Data.Int (Int32)
 import Data.List
 
+#ifdef DEFAULT_SIGNATURES
+import Data.Typeable (Typeable, typeRep)
+#endif
+
 -- | The central mechanism for dealing with version control.
 --
 --   This type class specifies what data migrations can happen
@@ -122,7 +126,6 @@ class SafeCopy a where
     -- message strings.
     -- Feel free to leave undefined in your instances.
     errorTypeName :: Proxy a -> String
-    errorTypeName _ = "<unknown type>"
 
 #ifdef DEFAULT_SIGNATURES
     default getCopy :: Serialize a => Contained (Get a)
@@ -130,6 +133,12 @@ class SafeCopy a where
 
     default putCopy :: Serialize a => a -> Contained Put
     putCopy = contain . put
+
+    default errorTypeName :: Typeable a => Proxy a -> String
+    errorTypeName prxy = show (typeRep prxy)
+#else
+    errorTypeName _ = "<unknown type>"
+
 #endif
 
 
