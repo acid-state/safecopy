@@ -5,6 +5,11 @@
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
+-- Hack for bug in older Cabal versions
+#ifndef MIN_VERSION_template_haskell
+#define MIN_VERSION_template_haskell(x,y,z) 1
+#endif
+
 import Control.Applicative
 import Control.Lens
 import Control.Lens.Action
@@ -100,6 +105,9 @@ do let a = conT ''Int
 
    safecopy <- reify ''SafeCopy
    preds <- 'prop_inverse ^!! act reify . (template :: Traversal' Info Pred)
+#if !MIN_VERSION_template_haskell(2,10,0)
+   classes <- mapM reify [ name | ClassP name _ <- preds ]
+#else
 --   print preds
 
    classes <-
@@ -108,9 +116,14 @@ do let a = conT ''Int
               mapM reify [ name | AppT (ConT name) _ <- cxt' ]
            _ -> error "FIXME: fix this code to handle this case."
 --   classes <- mapM reify [ ]
+#endif
    def <- a
 
+#if MIN_VERSION_template_haskell(2,11,0)
    let instances (ClassI _ decs) = [ typ | InstanceD _ _ (AppT _ typ) _ <- decs ]
+#else
+   let instances (ClassI _ decs) = [ typ | InstanceD _ (AppT _ typ) _ <- decs ]
+#endif
        instances _ = []
        types = map instances classes
 
@@ -134,6 +147,11 @@ do let a = conT ''Int
                ($(downsize typ) (prop_inverse :: $(return typ) -> Property)) |]
 
        props = listE . map prop
+
+#if !MIN_VERSION_template_haskell(2,8,0)
+       -- 'report' throws warnings in template-haskell-2.8.0.0
+       reportWarning = report False
+#endif
 
    mapM_ (\typ -> reportWarning $ "not tested: " ++ name typ) untested
 
