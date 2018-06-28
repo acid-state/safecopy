@@ -105,9 +105,6 @@ do let a = conT ''Int
 
    safecopy <- reify ''SafeCopy
    preds <- 'prop_inverse ^!! act reify . (template :: Traversal' Info Pred)
-#if !MIN_VERSION_template_haskell(2,10,0)
-   classes <- mapM reify [ name | ClassP name _ <- preds ]
-#else
 --   print preds
 
    classes <-
@@ -116,7 +113,6 @@ do let a = conT ''Int
               mapM reify [ name | AppT (ConT name) _ <- cxt' ]
            _ -> error "FIXME: fix this code to handle this case."
 --   classes <- mapM reify [ ]
-#endif
    def <- a
 
 #if MIN_VERSION_template_haskell(2,11,0)
@@ -147,11 +143,6 @@ do let a = conT ''Int
                ($(downsize typ) (prop_inverse :: $(return typ) -> Property)) |]
 
        props = listE . map prop
-
-#if !MIN_VERSION_template_haskell(2,8,0)
-       -- 'report' throws warnings in template-haskell-2.8.0.0
-       reportWarning = report False
-#endif
 
    mapM_ (\typ -> reportWarning $ "not tested: " ++ name typ) untested
 

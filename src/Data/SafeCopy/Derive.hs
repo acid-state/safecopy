@@ -10,14 +10,8 @@ module Data.SafeCopy.Derive where
 import Data.Serialize (getWord8, putWord8, label)
 import Data.SafeCopy.SafeCopy
 
-#if MIN_VERSION_template_haskell(2,8,0)
 import Language.Haskell.TH hiding (Kind)
-#else
-import Language.Haskell.TH hiding (Kind(..))
-#endif
-#if !MIN_VERSION_base(4,8,0)
 import Control.Applicative
-#endif
 import Control.Monad
 import Data.Maybe (fromMaybe)
 #ifdef __HADDOCK__
@@ -228,9 +222,7 @@ forceTag _             = False
 
 tyVarName :: TyVarBndr -> Name
 tyVarName (PlainTV n) = n
-#if MIN_VERSION_template_haskell(2,10,0)
 tyVarName (KindedTV n _) = n
-#endif
 
 internalDeriveSafeCopy :: DeriveType -> Version a -> Name -> Name -> Q [Dec]
 internalDeriveSafeCopy deriveType versionId kindName tyName = do
@@ -279,11 +271,7 @@ internalDeriveSafeCopy' deriveType versionId kindName tyName info = do
     worker = worker' (conT tyName)
     worker' tyBase context tyvars cons =
       let ty = foldl appT tyBase [ varT $ tyVarName var | var <- tyvars ]
-#if MIN_VERSION_template_haskell(2,10,0)
           safeCopyClass args = foldl appT (conT ''SafeCopy) args
-#else
-          safeCopyClass args = classP ''SafeCopy args
-#endif
       in (:[]) <$> instanceD (cxt $ [safeCopyClass [varT $ tyVarName var] | var <- tyvars] ++ map return context)
                                        (conT ''SafeCopy `appT` ty)
                                        [ mkPutCopy deriveType cons
@@ -331,11 +319,7 @@ internalDeriveSafeCopyIndexedType' deriveType versionId kindName tyName tyIndex'
     typeNameStr = unwords $ map show (tyName:tyIndex')
     worker' tyBase context tyvars cons =
       let ty = foldl appT tyBase [ varT $ tyVarName var | var <- tyvars ]
-#if MIN_VERSION_template_haskell(2,10,0)
           safeCopyClass args = foldl appT (conT ''SafeCopy) args
-#else
-          safeCopyClass args = classP ''SafeCopy args
-#endif
       in (:[]) <$> instanceD (cxt $ [safeCopyClass [varT $ tyVarName var] | var <- tyvars] ++ map return context)
                                        (conT ''SafeCopy `appT` ty)
                                        [ mkPutCopy deriveType cons
