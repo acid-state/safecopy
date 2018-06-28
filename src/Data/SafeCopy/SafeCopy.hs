@@ -1,5 +1,5 @@
 {-# LANGUAGE GADTs, TypeFamilies, FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DefaultSignatures, ScopedTypeVariables #-}
 
 {-# LANGUAGE CPP #-}
 
@@ -23,6 +23,7 @@ import Data.Serialize
 import Control.Monad
 import Data.Int (Int32)
 import Data.List
+import Data.Typeable (Typeable)
 
 -- | The central mechanism for dealing with version control.
 --
