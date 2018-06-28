@@ -1,20 +1,11 @@
 {-# LANGUAGE TemplateHaskell, CPP #-}
 
--- Hack for bug in older Cabal versions
-#ifndef MIN_VERSION_template_haskell
-#define MIN_VERSION_template_haskell(x,y,z) 1
-#endif
-
 module Data.SafeCopy.Derive where
 
 import Data.Serialize (getWord8, putWord8, label)
 import Data.SafeCopy.SafeCopy
 
-#if MIN_VERSION_template_haskell(2,8,0)
 import Language.Haskell.TH hiding (Kind)
-#else
-import Language.Haskell.TH hiding (Kind(..))
-#endif
 #if !MIN_VERSION_base(4,8,0)
 import Control.Applicative
 #endif
@@ -228,9 +219,7 @@ forceTag _             = False
 
 tyVarName :: TyVarBndr -> Name
 tyVarName (PlainTV n) = n
-#if MIN_VERSION_template_haskell(2,10,0)
 tyVarName (KindedTV n _) = n
-#endif
 
 internalDeriveSafeCopy :: DeriveType -> Version a -> Name -> Name -> Q [Dec]
 internalDeriveSafeCopy deriveType versionId kindName tyName = do
@@ -240,37 +229,21 @@ internalDeriveSafeCopy deriveType versionId kindName tyName = do
 internalDeriveSafeCopy' :: DeriveType -> Version a -> Name -> Name -> Info -> Q [Dec]
 internalDeriveSafeCopy' deriveType versionId kindName tyName info = do
   case info of
-#if MIN_VERSION_template_haskell(2,11,0)
     TyConI (DataD context _name tyvars _kind cons _derivs)
-#else
-    TyConI (DataD context _name tyvars cons _derivs)
-#endif
       | length cons > 255 -> fail $ "Can't derive SafeCopy instance for: " ++ show tyName ++
                                     ". The datatype must have less than 256 constructors."
       | otherwise         -> worker context tyvars (zip [0..] cons)
 
-#if MIN_VERSION_template_haskell(2,11,0)
     TyConI (NewtypeD context _name tyvars _kind con _derivs) ->
-#else
-    TyConI (NewtypeD context _name tyvars con _derivs) ->
-#endif
       worker context tyvars [(0, con)]
 
     FamilyI _ insts -> do
       decs <- forM insts $ \inst ->
         case inst of
-#if MIN_VERSION_template_haskell(2,11,0)
           DataInstD context _name ty _kind cons _derivs ->
-#else
-          DataInstD context _name ty cons _derivs ->
-#endif
               worker' (foldl appT (conT tyName) (map return ty)) context [] (zip [0..] cons)
 
-#if MIN_VERSION_template_haskell(2,11,0)
           NewtypeInstD context _name ty _kind con _derivs ->
-#else
-          NewtypeInstD context _name ty con _derivs ->
-#endif
               worker' (foldl appT (conT tyName) (map return ty)) context [] [(0, con)]
           _ -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, inst)
       return $ concat decs
@@ -279,11 +252,7 @@ internalDeriveSafeCopy' deriveType versionId kindName tyName info = do
     worker = worker' (conT tyName)
     worker' tyBase context tyvars cons =
       let ty = foldl appT tyBase [ varT $ tyVarName var | var <- tyvars ]
-#if MIN_VERSION_template_haskell(2,10,0)
           safeCopyClass args = foldl appT (conT ''SafeCopy) args
-#else
-          safeCopyClass args = classP ''SafeCopy args
-#endif
       in (:[]) <$> instanceD (cxt $ [safeCopyClass [varT $ tyVarName var] | var <- tyvars] ++ map return context)
                                        (conT ''SafeCopy `appT` ty)
                                        [ mkPutCopy deriveType cons
@@ -305,21 +274,13 @@ internalDeriveSafeCopyIndexedType' deriveType versionId kindName tyName tyIndex'
     FamilyI _ insts -> do
       decs <- forM insts $ \inst ->
         case inst of
-#if MIN_VERSION_template_haskell(2,11,0)
           DataInstD context _name ty _kind cons _derivs
-#else
-          DataInstD context _name ty cons _derivs
-#endif
             | ty == tyIndex ->
               worker' (foldl appT (conT tyName) (map return ty)) context [] (zip [0..] cons)
             | otherwise ->
               return []
 
-#if MIN_VERSION_template_haskell(2,11,0)
           NewtypeInstD context _name ty _kind con _derivs
-#else
-          NewtypeInstD context _name ty con _derivs
-#endif
             | ty == tyIndex ->
               worker' (foldl appT (conT tyName) (map return ty)) context [] [(0, con)]
             | otherwise ->
@@ -331,11 +292,7 @@ internalDeriveSafeCopyIndexedType' deriveType versionId kindName tyName tyIndex'
     typeNameStr = unwords $ map show (tyName:tyIndex')
     worker' tyBase context tyvars cons =
       let ty = foldl appT tyBase [ varT $ tyVarName var | var <- tyvars ]
-#if MIN_VERSION_template_haskell(2,10,0)
           safeCopyClass args = foldl appT (conT ''SafeCopy) args
-#else
-          safeCopyClass args = classP ''SafeCopy args
-#endif
       in (:[]) <$> instanceD (cxt $ [safeCopyClass [varT $ tyVarName var] | var <- tyvars] ++ map return context)
                                        (conT ''SafeCopy `appT` ty)
                                        [ mkPutCopy deriveType cons
@@ -433,10 +390,8 @@ conSize (NormalC _name args) = length args
 conSize (RecC _name recs)    = length recs
 conSize InfixC{}             = 2
 conSize ForallC{}            = error "Found constructor with existentially quantified binder. Cannot derive SafeCopy for it."
-#if MIN_VERSION_template_haskell(2,11,0)
 conSize GadtC{}              = error "Found GADT constructor. Cannot derive SafeCopy for it."
 conSize RecGadtC{}           = error "Found GADT constructor. Cannot derive SafeCopy for it."
-#endif
 
 conName :: Con -> Name
 conName (NormalC name _args) = name
