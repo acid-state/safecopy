@@ -23,7 +23,7 @@ import Data.Serialize
 import Control.Monad
 import Data.Int (Int32)
 import Data.List
-import Data.Typeable (Typeable)
+import Data.Typeable (Typeable, typeRep)
 
 -- | The central mechanism for dealing with version control.
 --
