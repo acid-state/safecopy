@@ -1,7 +1,4 @@
-{-# LANGUAGE CPP #-}
-#ifdef SAFE_HASKELL
 {-# LANGUAGE Trustworthy #-}
-#endif
 
 -----------------------------------------------------------------------------
 -- |

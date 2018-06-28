@@ -2,9 +2,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 {-# LANGUAGE CPP #-}
-#ifdef DEFAULT_SIGNATURES
-{-# LANGUAGE DefaultSignatures #-}
-#endif
 
 -----------------------------------------------------------------------------
 -- |
@@ -26,10 +23,6 @@ import Data.Serialize
 import Control.Monad
 import Data.Int (Int32)
 import Data.List
-
-#ifdef DEFAULT_SIGNATURES
-import Data.Typeable (Typeable, typeRep)
-#endif
 
 -- | The central mechanism for dealing with version control.
 --
@@ -127,7 +120,6 @@ class SafeCopy a where
     -- Feel free to leave undefined in your instances.
     errorTypeName :: Proxy a -> String
 
-#ifdef DEFAULT_SIGNATURES
     default getCopy :: Serialize a => Contained (Get a)
     getCopy = contain get
 
@@ -136,11 +128,6 @@ class SafeCopy a where
 
     default errorTypeName :: Typeable a => Proxy a -> String
     errorTypeName prxy = show (typeRep prxy)
-#else
-    errorTypeName _ = "<unknown type>"
-
-#endif
-
 
 -- constructGetterFromVersion :: SafeCopy a => Version a -> Kind (MigrateFrom (Reverse a)) -> Get (Get a)
 constructGetterFromVersion :: SafeCopy a => Version a -> Kind a -> Either String (Get a)
