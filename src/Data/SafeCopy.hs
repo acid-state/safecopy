@@ -49,8 +49,8 @@
 --     getCopy = contain $ Contacts_v0 \<$\> safeGet
 --
 --data Contact = Contact { name    :: Name
---                        , address :: Address
---                        , phone   :: Phone }
+--                       , address :: Address
+--                       , phone   :: Phone }
 --instance SafeCopy Contact where
 --    putCopy Contact{..} = contain $ do safePut name; safePut address; safePut phone
 --    getCopy = contain $ Contact \<$\> safeGet \<*\> safeGet \<*\> safeGet
