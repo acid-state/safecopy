@@ -41,6 +41,9 @@ import           Data.Typeable hiding (Proxy)
 import           Data.Typeable
 #endif
 import           Data.Word
+#if MIN_VERSION_base(4,8,0)
+import           Numeric.Natural (Natural)
+#endif
 import           System.Time (ClockTime(..), TimeDiff(..), CalendarTime(..), Month(..))
 import qualified System.Time as OT
 import qualified Data.Vector as V
@@ -169,6 +172,10 @@ instance SafeCopy Int where
     getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
 instance SafeCopy Integer where
     getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
+#if MIN_VERSION_base(4,8,0)
+instance SafeCopy Natural where
+    getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
+#endif
 
 -- | cereal change the formats for Float/Double in 0.5.*
 --
