@@ -15,7 +15,7 @@ Category:            Data, Parsing
 Build-type:          Simple
 Extra-source-files: CHANGELOG.md
 Cabal-version:       >=1.8
-tested-with:         GHC==7.8.4, GHC==7.10.2, GHC==8.0.2, GHC==8.2.1, GHC==8.4.1
+tested-with:         GHC==8.0.2, GHC==8.2.1, GHC==8.4.1
 
 Source-repository head
   type:          git
