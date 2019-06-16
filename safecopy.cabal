@@ -75,4 +75,4 @@ Test-suite generic
   Main-is:             generic.hs
   Hs-Source-Dirs:      test/
   GHC-Options:         -Wall -threaded -rtsopts -with-rtsopts=-N
-  Build-depends:       base, bytestring, cereal, safecopy, HUnit, uuid, uuid-orphans
+  Build-depends:       base, bytestring, cereal, safecopy, HUnit
