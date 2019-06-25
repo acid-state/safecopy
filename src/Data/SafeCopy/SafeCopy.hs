@@ -283,7 +283,7 @@ data DatatypeInfo =
 -- | Whereas the other 'getSafeGet' is only run when we know we need a
 -- version, this one is run for every field and must decide whether to
 -- read a version or not.  It constructs a Map TypeRep Int32 and reads
--- whent he new TypeRep is not in the map.  Assumes Version a ~ Int32.
+-- whent he new TypeRep is not in the map.
 getSafeGetGeneric ::
   forall a. (SafeCopy a, Typeable a)
   => StateT (Map TypeRep Int32) Get (Get a)
@@ -294,7 +294,6 @@ getSafeGetGeneric
         a_kind    -> do let rep = typeRep (Proxy :: Proxy a)
                         reps <- State.get
                         v <- maybe (lift get) pure (Map.lookup rep reps)
-                        -- This coerce creates an assumption that Version a ~ Int32
                         case constructGetterFromVersion (unsafeCoerce v) a_kind of
                           Right getter -> State.modify (Map.insert rep v) >> return getter
                           Left msg     -> fail msg
