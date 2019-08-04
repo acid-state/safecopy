@@ -102,7 +102,7 @@ newtype Prim a = Prim { getPrimitive :: a }
 --   even though 'getCopy' and 'putCopy' can't be used directly.
 --   To serialize/parse a data type using 'SafeCopy', see 'safeGet'
 --   and 'safePut'.
-class Typeable a => SafeCopy a where
+class SafeCopy a where
     -- | The version of the type.
     --
     --   Only used as a key so it must be unique (this is checked at run-time)
@@ -148,6 +148,7 @@ class Typeable a => SafeCopy a where
     -- | The name of the type. This is only used in error message
     -- strings.
     errorTypeName :: Proxy a -> String
+    default errorTypeName :: Typeable a => Proxy a -> String
     errorTypeName _ = show (typeRep (Proxy @a))
 
 #ifdef DEFAULT_SIGNATURES
@@ -168,6 +169,9 @@ instance (GPutCopy f p, GPutCopy g p) => GPutCopy (f :+: g) p where
     gputCopy p (L1 x) = gputCopy @f p x
     gputCopy p (R1 x) = gputCopy @g p x
     {-# INLINE gputCopy #-}
+
+-- | A constraint that combines 'SafeCopy' and 'Typeable'.
+type SafeCopy' a = (SafeCopy a, Typeable a)
 
 -- To get the current safecopy behavior we need to emulate the
 -- template haskell code here - collect the (a -> Put) values for all
@@ -195,7 +199,7 @@ instance GPutFields f p => GPutFields (M1 S c f) p where
     gputFields p (M1 a) = gputFields p a
     {-# INLINE gputFields #-}
 
-instance SafeCopy a => GPutFields (K1 R a) p where
+instance SafeCopy' a => GPutFields (K1 R a) p where
     gputFields _ (K1 a) = do
       getSafePutGeneric putCopy a
     {-# INLINE gputFields #-}
@@ -264,7 +268,7 @@ instance GGetFields f p => GGetFields (M1 S c f) p where
       return (M1 <$> getter)
     {-# INLINE ggetFields #-}
 
-instance SafeCopy a => GGetFields (K1 R a) p where
+instance SafeCopy' a => GGetFields (K1 R a) p where
     ggetFields _ = do
       getter <- getSafeGetGeneric
       return (K1 <$> getter)
@@ -284,7 +288,7 @@ data DatatypeInfo =
 -- read a version or not.  It constructs a Map TypeRep Int32 and reads
 -- whent he new TypeRep is not in the map.
 getSafeGetGeneric ::
-  forall a. SafeCopy a
+  forall a. SafeCopy' a
   => StateT (Map TypeRep Int32) Get (Get a)
 getSafeGetGeneric
     = checkConsistency proxy $
@@ -303,7 +307,7 @@ getSafeGetGeneric
 -- type prevents doing this because each fields may have a different
 -- type.  Maybe you can show me a better way
 getSafePutGeneric ::
-  forall a. SafeCopy a
+  forall a. SafeCopy' a
   => (a -> Contained Put)
   -> a
   -> RWST () [Put] (Set TypeRep) PutM ()
@@ -319,7 +323,7 @@ getSafePutGeneric cput a
                         tell [unsafeUnPack (cput $ asProxyType a proxy)]
     where proxy = Proxy :: Proxy a
 
-type GSafeCopy a = (SafeCopy a, Typeable a, Generic a, GPutCopy (Rep a) DatatypeInfo, Constructors a)
+type GSafeCopy a = (SafeCopy' a, Generic a, GPutCopy (Rep a) DatatypeInfo, Constructors a)
 
 -- | Generic only version of safePut. Instead of calling 'putCopy' it
 -- calls 'putCopyDefault', a copy of the implementation of the
