@@ -253,7 +253,7 @@ instance (Integral a, SafeCopy a) => SafeCopy (Ratio a) where
     putCopy r = contain $ do safePut (numerator   r)
                              safePut (denominator r)
     errorTypeName = typeName1
-instance (HasResolution a, Fractional (Fixed a)) => SafeCopy (Fixed a) where
+instance (HasResolution a, Fractional (Fixed a), Typeable a) => SafeCopy (Fixed a) where
     getCopy   = contain $ fromRational <$> safeGet
     putCopy   = contain . safePut . toRational
     errorTypeName = typeName1
