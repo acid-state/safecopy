@@ -217,6 +217,10 @@ instance (GPutFields (K1 R ()) p) => GPutFields U1 p where
 #endif
     {-# INLINE gputFields #-}
 
+instance GPutFields V1 p where
+    gputFields _ _ = undefined
+    {-# INLINE gputFields #-}
+
 ------------------------------------------------------------------------
 
 class GGetCopy f p where
@@ -276,6 +280,10 @@ instance SafeCopy' a => GGetFields (K1 R a) p where
 
 instance GGetFields U1 p where
     ggetFields _p = pure (pure U1)
+    {-# INLINE ggetFields #-}
+
+instance GGetFields V1 p where
+    ggetFields _p = undefined
     {-# INLINE ggetFields #-}
 
 data DatatypeInfo =
