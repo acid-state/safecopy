@@ -148,10 +148,11 @@ class SafeCopy a where
     -- | The name of the type. This is only used in error message
     -- strings.
     errorTypeName :: Proxy a -> String
+
+#ifdef DEFAULT_SIGNATURES
     default errorTypeName :: Typeable a => Proxy a -> String
     errorTypeName _ = show (typeRep (Proxy @a))
 
-#ifdef DEFAULT_SIGNATURES
     default putCopy :: (GPutCopy (Rep a) DatatypeInfo, Constructors a) => a -> Contained Put
     putCopy a = (contain . gputCopy (ConstructorInfo (fromIntegral (gconNum @a)) (fromIntegral (gconIndex a))) . from) a
 
@@ -194,6 +195,7 @@ class GPutFields f p where
 
 instance (GPutFields f p, GPutFields g p) => GPutFields (f :*: g) p where
     gputFields p (a :*: b) = gputFields p a >> gputFields p b
+    {-# INLINE gputFields #-}
 
 instance GPutFields f p => GPutFields (M1 S c f) p where
     gputFields p (M1 a) = gputFields p a
@@ -250,6 +252,7 @@ instance (GGetCopy f p, GGetCopy g p, p ~ DatatypeInfo) => GGetCopy (f :+: g) p 
       case _code p < sizeL of
         True -> L1 <$> ggetCopy @f (ConstructorInfo sizeL (_code p))
         False -> R1 <$> ggetCopy @g (ConstructorInfo sizeR (_code p - sizeL))
+    {-# INLINE ggetCopy #-}
 
 instance GGetFields f p => GGetCopy (M1 C c f) p where
     ggetCopy p = do
@@ -265,6 +268,7 @@ instance (GGetFields f p, GGetFields g p) => GGetFields (f :*: g) p where
       fgetter <- ggetFields @f p
       ggetter <- ggetFields @g p
       return ((:*:) <$> fgetter <*> ggetter)
+    {-# INLINE ggetFields #-}
 
 instance GGetFields f p => GGetFields (M1 S c f) p where
     ggetFields p = do
