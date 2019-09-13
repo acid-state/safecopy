@@ -3,7 +3,7 @@
 -- http://www.haskell.org/cabal/release/cabal-latest/doc/users-guide/authors.html#pkg-descr.
 -- The name of the package.
 Name:                safecopy
-Version:             0.9.5
+Version:             0.10.0
 Synopsis:            Binary serialization with version control.
 Description:         An extension to Data.Serialize with built-in version control.
 Homepage:            https://github.com/acid-state/safecopy
@@ -15,7 +15,7 @@ Category:            Data, Parsing
 Build-type:          Simple
 Extra-source-files: CHANGELOG.md
 Cabal-version:       >=1.8
-tested-with:         GHC==8.0.2, GHC==8.2.1, GHC==8.4.1
+tested-with:         GHC==8.0.2, GHC==8.2.1, GHC==8.4.1, GHC==8.6.5
 
 Source-repository head
   type:          git
