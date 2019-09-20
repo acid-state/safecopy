@@ -3,7 +3,7 @@
 -- http://www.haskell.org/cabal/release/cabal-latest/doc/users-guide/authors.html#pkg-descr.
 -- The name of the package.
 Name:                safecopy
-Version:             0.10.0
+Version:             0.10.1
 Synopsis:            Binary serialization with version control.
 Description:         An extension to Data.Serialize with built-in version control.
 Homepage:            https://github.com/acid-state/safecopy
@@ -30,7 +30,7 @@ Library
   Hs-Source-Dirs:      src/
 
   -- Packages needed in order to build this package.
-  Build-depends:       base >=4.5 && <5,
+  Build-depends:       base >=4.9 && <5,
                        array < 0.6,
                        cereal >= 0.5 && < 0.6,
                        bytestring < 0.11,
@@ -43,9 +43,6 @@ Library
                        transformers < 0.6,
                        vector >= 0.10 && < 0.13
 
-  if !impl(ghc > 8.0)
-    Build-Depends:     semigroups >= 0.18 && < 0.19
-
   -- Modules not exported by this package.
   Other-modules:       Data.SafeCopy.Instances, Data.SafeCopy.SafeCopy,
                        Data.SafeCopy.Derive
@@ -55,11 +52,7 @@ Library
 
   GHC-Options:         -Wall
 
-  if(impl(ghc >= 7.2.1))
-    cpp-options: -DDEFAULT_SIGNATURES
-
-  if(impl(ghc >= 7.1))
-    cpp-options: -DSAFE_HASKELL
+  cpp-options: -DDEFAULT_SIGNATURES -DSAFE_HASKELL
 
 Test-suite instances
   Type:                exitcode-stdio-1.0

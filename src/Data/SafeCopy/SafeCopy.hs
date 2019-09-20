@@ -1,21 +1,15 @@
-{-# LANGUAGE GADTs, TypeFamilies, FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
-{-# LANGUAGE CPP #-}
-#ifdef DEFAULT_SIGNATURES
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
-#endif
 
 -----------------------------------------------------------------------------
 -- |
@@ -32,27 +26,23 @@
 --
 module Data.SafeCopy.SafeCopy where
 
-import Data.Serialize
-
 import Control.Monad
-import Data.Int (Int32)
-import Data.List
-
-#ifdef DEFAULT_SIGNATURES
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State as State (evalStateT, modify, StateT)
 import qualified Control.Monad.Trans.State as State (get)
 import Control.Monad.Trans.RWS as RWS (evalRWST, modify, RWST, tell)
 import qualified Control.Monad.Trans.RWS as RWS (get)
 import Data.Bits (shiftR)
+import Data.Int (Int32)
+import Data.List
 import Data.Map as Map (Map, lookup, insert)
+import Data.Serialize
 import Data.Set as Set (insert, member, Set)
 import Data.Typeable (Typeable, TypeRep, typeOf, typeRep)
 import Data.Word (Word8)
 import GHC.Generics
 import Generic.Data as G (Constructors, gconIndex, gconNum)
 import Unsafe.Coerce (unsafeCoerce)
-#endif
 
 -- | The central mechanism for dealing with version control.
 --
@@ -149,7 +139,6 @@ class SafeCopy a where
     -- strings.
     errorTypeName :: Proxy a -> String
 
-#ifdef DEFAULT_SIGNATURES
     default errorTypeName :: Typeable a => Proxy a -> String
     errorTypeName _ = show (typeRep (Proxy @a))
 
@@ -206,17 +195,16 @@ instance SafeCopy' a => GPutFields (K1 R a) p where
       getSafePutGeneric putCopy a
     {-# INLINE gputFields #-}
 
-#if 1
 -- This corresponds to ggetFields, but does it match deriveSafeCopy?
 instance GPutFields U1 p where
     gputFields _ _ =
       return ()
-#else
+{-
 -- This outputs the version tag for (), which is 1.
 instance (GPutFields (K1 R ()) p) => GPutFields U1 p where
     gputFields p _ =
       gputFields p (K1 () :: K1 R () p)
-#endif
+-}
     {-# INLINE gputFields #-}
 
 instance GPutFields V1 p where
@@ -349,7 +337,6 @@ safePutGeneric a = do
 -- implementation of the putCopy method.
 putCopyDefault :: forall a. GSafeCopy a => a -> Contained Put
 putCopyDefault a = (contain . gputCopy (ConstructorInfo (fromIntegral (gconNum @a)) (fromIntegral (gconIndex a))) . from) a
-#endif
 
 -- constructGetterFromVersion :: SafeCopy a => Version a -> Kind (MigrateFrom (Reverse a)) -> Get (Get a)
 constructGetterFromVersion :: SafeCopy a => Version a -> Kind a -> Either String (Get a)
