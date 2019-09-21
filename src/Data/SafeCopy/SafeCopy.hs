@@ -28,6 +28,7 @@ module Data.SafeCopy.SafeCopy where
 
 import Control.Monad
 import Control.Monad.Trans.Class (lift)
+import qualified Control.Monad.Fail as Fail
 import Control.Monad.Trans.State as State (evalStateT, modify, StateT)
 import qualified Control.Monad.Trans.State as State (get)
 import Control.Monad.Trans.RWS as RWS (evalRWST, modify, RWST, tell)
@@ -312,7 +313,7 @@ getSafePutGeneric ::
   -> a
   -> RWST () [Put] (Set TypeRep) PutM ()
 getSafePutGeneric cput a
-    = checkConsistency proxy $
+    = unpureCheckConsistency proxy $
       case kindFromProxy proxy of
         Primitive -> tell [unsafeUnPack (cput $ asProxyType a proxy)]
         _         -> do reps <- RWS.get
@@ -410,7 +411,7 @@ safePut a
 --   when serializing multiple values with the same version. See 'getSafeGet'.
 getSafePut :: forall a. SafeCopy a => PutM (a -> Put)
 getSafePut
-    = checkConsistency proxy $
+    = unpureCheckConsistency proxy $
       case kindFromProxy proxy of
         Primitive -> return $ \a -> unsafeUnPack (putCopy $ asProxyType a proxy)
         _         -> do put (versionFromProxy proxy)
@@ -539,10 +540,18 @@ validChain a_proxy =
                   Extended sub_kind   -> check sub_kind
 
 -- Verify that the SafeCopy instance is consistent.
-checkConsistency :: (SafeCopy a, Monad m) => Proxy a -> m b -> m b
+checkConsistency :: (SafeCopy a, Fail.MonadFail m) => Proxy a -> m b -> m b
 checkConsistency proxy ks
     = case consistentFromProxy proxy of
-        NotConsistent msg -> fail msg
+        NotConsistent msg -> Fail.fail msg
+        Consistent        -> ks
+
+-- | PutM doesn't have reasonable 'fail' implementation.
+-- It just throws unpure exception anyway.
+unpureCheckConsistency :: SafeCopy a => Proxy a -> b -> b
+unpureCheckConsistency proxy ks
+    = case consistentFromProxy proxy of
+        NotConsistent msg -> error $ "unpureCheckConsistency: " ++ msg
         Consistent        -> ks
 
 {-# INLINE computeConsistency #-}
