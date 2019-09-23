@@ -1,21 +1,15 @@
-{-# LANGUAGE GADTs, TypeFamilies, FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
-{-# LANGUAGE CPP #-}
-#ifdef DEFAULT_SIGNATURES
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
-#endif
 
 -----------------------------------------------------------------------------
 -- |
@@ -32,27 +26,24 @@
 --
 module Data.SafeCopy.SafeCopy where
 
-import Data.Serialize
-
 import Control.Monad
-import Data.Int (Int32)
-import Data.List
-
-#ifdef DEFAULT_SIGNATURES
 import Control.Monad.Trans.Class (lift)
+import qualified Control.Monad.Fail as Fail
 import Control.Monad.Trans.State as State (evalStateT, modify, StateT)
 import qualified Control.Monad.Trans.State as State (get)
 import Control.Monad.Trans.RWS as RWS (evalRWST, modify, RWST, tell)
 import qualified Control.Monad.Trans.RWS as RWS (get)
 import Data.Bits (shiftR)
+import Data.Int (Int32)
+import Data.List
 import Data.Map as Map (Map, lookup, insert)
+import Data.Serialize
 import Data.Set as Set (insert, member, Set)
 import Data.Typeable (Typeable, TypeRep, typeOf, typeRep)
 import Data.Word (Word8)
 import GHC.Generics
 import Generic.Data as G (Constructors, gconIndex, gconNum)
 import Unsafe.Coerce (unsafeCoerce)
-#endif
 
 -- | The central mechanism for dealing with version control.
 --
@@ -148,10 +139,10 @@ class SafeCopy a where
     -- | The name of the type. This is only used in error message
     -- strings.
     errorTypeName :: Proxy a -> String
+
     default errorTypeName :: Typeable a => Proxy a -> String
     errorTypeName _ = show (typeRep (Proxy @a))
 
-#ifdef DEFAULT_SIGNATURES
     default putCopy :: (GPutCopy (Rep a) DatatypeInfo, Constructors a) => a -> Contained Put
     putCopy a = (contain . gputCopy (ConstructorInfo (fromIntegral (gconNum @a)) (fromIntegral (gconIndex a))) . from) a
 
@@ -194,6 +185,7 @@ class GPutFields f p where
 
 instance (GPutFields f p, GPutFields g p) => GPutFields (f :*: g) p where
     gputFields p (a :*: b) = gputFields p a >> gputFields p b
+    {-# INLINE gputFields #-}
 
 instance GPutFields f p => GPutFields (M1 S c f) p where
     gputFields p (M1 a) = gputFields p a
@@ -204,17 +196,16 @@ instance SafeCopy' a => GPutFields (K1 R a) p where
       getSafePutGeneric putCopy a
     {-# INLINE gputFields #-}
 
-#if 1
 -- This corresponds to ggetFields, but does it match deriveSafeCopy?
 instance GPutFields U1 p where
     gputFields _ _ =
       return ()
-#else
+{-
 -- This outputs the version tag for (), which is 1.
 instance (GPutFields (K1 R ()) p) => GPutFields U1 p where
     gputFields p _ =
       gputFields p (K1 () :: K1 R () p)
-#endif
+-}
     {-# INLINE gputFields #-}
 
 instance GPutFields V1 p where
@@ -250,6 +241,7 @@ instance (GGetCopy f p, GGetCopy g p, p ~ DatatypeInfo) => GGetCopy (f :+: g) p 
       case _code p < sizeL of
         True -> L1 <$> ggetCopy @f (ConstructorInfo sizeL (_code p))
         False -> R1 <$> ggetCopy @g (ConstructorInfo sizeR (_code p - sizeL))
+    {-# INLINE ggetCopy #-}
 
 instance GGetFields f p => GGetCopy (M1 C c f) p where
     ggetCopy p = do
@@ -265,6 +257,7 @@ instance (GGetFields f p, GGetFields g p) => GGetFields (f :*: g) p where
       fgetter <- ggetFields @f p
       ggetter <- ggetFields @g p
       return ((:*:) <$> fgetter <*> ggetter)
+    {-# INLINE ggetFields #-}
 
 instance GGetFields f p => GGetFields (M1 S c f) p where
     ggetFields p = do
@@ -320,7 +313,7 @@ getSafePutGeneric ::
   -> a
   -> RWST () [Put] (Set TypeRep) PutM ()
 getSafePutGeneric cput a
-    = checkConsistency proxy $
+    = unpureCheckConsistency proxy $
       case kindFromProxy proxy of
         Primitive -> tell [unsafeUnPack (cput $ asProxyType a proxy)]
         _         -> do reps <- RWS.get
@@ -345,7 +338,6 @@ safePutGeneric a = do
 -- implementation of the putCopy method.
 putCopyDefault :: forall a. GSafeCopy a => a -> Contained Put
 putCopyDefault a = (contain . gputCopy (ConstructorInfo (fromIntegral (gconNum @a)) (fromIntegral (gconIndex a))) . from) a
-#endif
 
 -- constructGetterFromVersion :: SafeCopy a => Version a -> Kind (MigrateFrom (Reverse a)) -> Get (Get a)
 constructGetterFromVersion :: SafeCopy a => Version a -> Kind a -> Either String (Get a)
@@ -419,7 +411,7 @@ safePut a
 --   when serializing multiple values with the same version. See 'getSafeGet'.
 getSafePut :: forall a. SafeCopy a => PutM (a -> Put)
 getSafePut
-    = checkConsistency proxy $
+    = unpureCheckConsistency proxy $
       case kindFromProxy proxy of
         Primitive -> return $ \a -> unsafeUnPack (putCopy $ asProxyType a proxy)
         _         -> do put (versionFromProxy proxy)
@@ -548,10 +540,18 @@ validChain a_proxy =
                   Extended sub_kind   -> check sub_kind
 
 -- Verify that the SafeCopy instance is consistent.
-checkConsistency :: (SafeCopy a, Monad m) => Proxy a -> m b -> m b
+checkConsistency :: (SafeCopy a, Fail.MonadFail m) => Proxy a -> m b -> m b
 checkConsistency proxy ks
     = case consistentFromProxy proxy of
-        NotConsistent msg -> fail msg
+        NotConsistent msg -> Fail.fail msg
+        Consistent        -> ks
+
+-- | PutM doesn't have reasonable 'fail' implementation.
+-- It just throws unpure exception anyway.
+unpureCheckConsistency :: SafeCopy a => Proxy a -> b -> b
+unpureCheckConsistency proxy ks
+    = case consistentFromProxy proxy of
+        NotConsistent msg -> error $ "unpureCheckConsistency: " ++ msg
         Consistent        -> ks
 
 {-# INLINE computeConsistency #-}

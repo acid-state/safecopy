@@ -1,0 +1,6 @@
+:set -isrc
+:set -itest
+:set -DDEFAULT_SIGNATURES
+:set -XOverloadedStrings
+:set -Wall -Wredundant-constraints
+:set prompt "λ> "
