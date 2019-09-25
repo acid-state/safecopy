@@ -242,11 +242,19 @@ internalDeriveSafeCopy' deriveType versionId kindName tyName info = do
     FamilyI _ insts -> do
       decs <- forM insts $ \inst ->
         case inst of
+#if MIN_VERSION_template_haskell(2,15,0)
+          DataInstD context _ nty _kind cons _derivs ->
+              worker' (return nty) context [] (zip [0..] cons)
+
+          NewtypeInstD context _ nty _kind con _derivs ->
+              worker' (return nty) context [] [(0, con)]
+#else
           DataInstD context _name ty _kind cons _derivs ->
               worker' (foldl appT (conT tyName) (map return ty)) context [] (zip [0..] cons)
 
           NewtypeInstD context _name ty _kind con _derivs ->
               worker' (foldl appT (conT tyName) (map return ty)) context [] [(0, con)]
+#endif
           _ -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, inst)
       return $ concat decs
     _ -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info)
@@ -276,15 +284,27 @@ internalDeriveSafeCopyIndexedType' deriveType versionId kindName tyName tyIndex'
     FamilyI _ insts -> do
       decs <- forM insts $ \inst ->
         case inst of
+#if MIN_VERSION_template_haskell(2,15,0)
+          DataInstD context _ nty _kind cons _derivs
+            | nty == foldl AppT (ConT tyName) tyIndex ->
+              worker' (return nty) context [] (zip [0..] cons)
+#else
           DataInstD context _name ty _kind cons _derivs
             | ty == tyIndex ->
               worker' (foldl appT (conT tyName) (map return ty)) context [] (zip [0..] cons)
+#endif
             | otherwise ->
               return []
 
+#if MIN_VERSION_template_haskell(2,15,0)
+          NewtypeInstD context _ nty _kind con _derivs
+            | nty == foldl AppT (ConT tyName) tyIndex ->
+              worker' (return nty) context [] [(0, con)]
+#else
           NewtypeInstD context _name ty _kind con _derivs
             | ty == tyIndex ->
               worker' (foldl appT (conT tyName) (map return ty)) context [] [(0, con)]
+#endif
             | otherwise ->
               return []
           _ -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, inst)
