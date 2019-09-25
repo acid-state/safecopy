@@ -37,7 +37,7 @@ Library
                        generic-data >= 0.3,
                        containers >= 0.3 && < 0.7,
                        old-time < 1.2,
-                       template-haskell < 2.16,
+                       template-haskell < 2.15,
                        text < 1.3,
                        time < 1.10,
                        transformers < 0.6,
