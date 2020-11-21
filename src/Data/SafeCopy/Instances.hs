@@ -169,7 +169,7 @@ instance SafeCopy Integer where
 instance SafeCopy Natural where
     getCopy = contain get; putCopy = contain . put; errorTypeName = typeName
 
--- | cereal change the formats for Float/Double in 0.5.*
+-- | cereal changed the formats for Float/Double in 0.5.*
 --
 -- https://github.com/GaloisInc/cereal/commit/47d839609413e3e9d1147b99c34ae421ae36bced
 -- https://github.com/GaloisInc/cereal/issues/35
@@ -190,7 +190,7 @@ instance SafeCopy Float where
   putCopy = contain . put
   errorTypeName = typeName
 
--- | cereal change the formats for Float/Double in 0.5.*
+-- | cereal changed the formats for Float/Double in 0.5.*
 --
 -- https://github.com/GaloisInc/cereal/commit/47d839609413e3e9d1147b99c34ae421ae36bced
 -- https://github.com/GaloisInc/cereal/issues/35
