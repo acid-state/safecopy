@@ -1,7 +1,7 @@
 SafeCopy
 ========
 
-[![Build Status](https://travis-ci.org/acid-state/safecopy.svg?branch=master)](https://travis-ci.org/acid-state/safecopy)
+[![Build Status](https://travis-ci.com/acid-state/safecopy.svg?branch=master)](https://travis-ci.com/acid-state/safecopy)
 [![Public Domain](http://b.repl.ca/v1/license-public-blue.png)](https://en.wikipedia.org/wiki/Public_domain_software)
 [![Haskell](http://b.repl.ca/v1/language-haskell-4e6272.png)](Http://www.haskell.org)
 [![Hackage Status](https://img.shields.io/hackage/v/safecopy.svg)][hackage]
