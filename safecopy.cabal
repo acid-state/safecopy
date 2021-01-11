@@ -14,7 +14,7 @@ Maintainer:          Lemmih <lemmih@gmail.com>
 Category:            Data, Parsing
 Build-type:          Simple
 Extra-source-files: CHANGELOG.md
-Cabal-version:       >=1.8
+Cabal-version:       >=1.10
 tested-with:         GHC==8.0.2, GHC==8.2.2, GHC==8.4.4, GHC==8.6.5, GHC==8.8.3, GHC==8.10.1
 
 Source-repository head
@@ -23,6 +23,7 @@ Source-repository head
 
 
 Library
+  Default-language:    Haskell2010
   -- Modules exported by the library.
   Exposed-modules:     Data.SafeCopy
                        Data.SafeCopy.Internal
@@ -55,6 +56,7 @@ Library
   cpp-options: -DDEFAULT_SIGNATURES -DSAFE_HASKELL
 
 Test-suite instances
+  Default-language:    Haskell2010
   Type:                exitcode-stdio-1.0
   Main-is:             instances.hs
   Hs-Source-Dirs:      test/
@@ -64,6 +66,7 @@ Test-suite instances
                        lens-action, tasty, tasty-quickcheck, quickcheck-instances, QuickCheck
 
 Test-suite generic
+  Default-language:    Haskell2010
   Type:                exitcode-stdio-1.0
   Main-is:             generic.hs
   Hs-Source-Dirs:      test/
