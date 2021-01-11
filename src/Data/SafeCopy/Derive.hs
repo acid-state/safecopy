@@ -219,9 +219,15 @@ forceTag :: DeriveType -> Bool
 forceTag HappstackData = True
 forceTag _             = False
 
+#if MIN_VERSION_template_haskell(2,17,0)
+tyVarName :: TyVarBndr s -> Name
+tyVarName (PlainTV n _) = n
+tyVarName (KindedTV n _ _) = n
+#else
 tyVarName :: TyVarBndr -> Name
 tyVarName (PlainTV n) = n
 tyVarName (KindedTV n _) = n
+#endif
 
 internalDeriveSafeCopy :: DeriveType -> Version a -> Name -> Name -> Q [Dec]
 internalDeriveSafeCopy deriveType versionId kindName tyName = do

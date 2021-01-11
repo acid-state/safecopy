@@ -217,9 +217,9 @@ t2 = (T2 'b')
 t3 = (T3 'c')
 t4 = T4 100 200 300
 
-$(deriveSafeCopy 3 'base ''T1)
 $(deriveSafeCopy 4 'base ''T2)
 $(deriveSafeCopy 5 'base ''T3)
+$(deriveSafeCopy 3 'base ''T1)
 $(deriveSafeCopy 6 'base ''T4)
 
 data T1G = T1G Char T2G T3G deriving (Generic, Show)
