@@ -67,11 +67,11 @@ newtype Reverse a = Reverse { unReverse :: a }
 --   Primitives kinds (see 'primitive') are not tagged with a version
 --   id and hence cannot be extended later.
 --
---   Extensions (see 'extension') tells the system that there exists
+--   Extensions (see 'extension') tell the system that there exists
 --   a previous version of the data type which should be migrated if
 --   needed.
 --
---   There is also a default kind which is neither primitive nor is
+--   There is also a default kind which is neither primitive nor
 --   an extension of a previous type.
 data Kind a where
     Primitive :: Kind a
@@ -117,7 +117,7 @@ class SafeCopy a where
 
     -- | This method defines how a value should be parsed without worrying about
     --   previous versions or migrations. This function cannot be used directly.
-    --   One should use 'safeGet', instead.
+    --   One should use 'safePut, instead.
     putCopy  :: a -> Contained Put
 
     -- | Internal function that should not be overrided.
@@ -287,7 +287,7 @@ data DatatypeInfo =
 -- | Whereas the other 'getSafeGet' is only run when we know we need a
 -- version, this one is run for every field and must decide whether to
 -- read a version or not.  It constructs a Map TypeRep Int32 and reads
--- whent he new TypeRep is not in the map.
+-- when the new TypeRep is not in the map.
 getSafeGetGeneric ::
   forall a. SafeCopy' a
   => StateT (Map TypeRep Int32) Get (Get a)
@@ -474,7 +474,7 @@ instance Serialize (Version a) where
 -- parsers/putters.
 
 -- | To ensure that no-one reads or writes values without handling versions
---   correct, it is necessary to restrict access to 'getCopy' and 'putCopy'.
+--   correctly, it is necessary to restrict access to 'getCopy' and 'putCopy'.
 --   This is where 'Contained' enters the picture. It allows you to put
 --   values in to a container but not to take them out again.
 newtype Contained a = Contained {unsafeUnPack :: a}
@@ -547,7 +547,7 @@ checkConsistency proxy ks
         Consistent        -> ks
 
 -- | PutM doesn't have reasonable 'fail' implementation.
--- It just throws unpure exception anyway.
+-- It just throws an unpure exception anyway.
 unpureCheckConsistency :: SafeCopy a => Proxy a -> b -> b
 unpureCheckConsistency proxy ks
     = case consistentFromProxy proxy of
