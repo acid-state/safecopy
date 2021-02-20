@@ -1,3 +1,12 @@
+0.10.4
+======
+
+Add a Typeable a superclass to SafeCopy.  The previous version in effect
+had the Typeable constraint anyway, this means less need to specify it.
+The SafeCopy' type alias is now identical to SafeCopy.  This should not
+break any code except perhaps some GADT types that use "deriving Typeable".
+These may need a standalone deriving instance.
+
 0.10.0
 ======
 

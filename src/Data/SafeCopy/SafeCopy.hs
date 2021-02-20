@@ -93,7 +93,7 @@ newtype Prim a = Prim { getPrimitive :: a }
 --   even though 'getCopy' and 'putCopy' can't be used directly.
 --   To serialize/parse a data type using 'SafeCopy', see 'safeGet'
 --   and 'safePut'.
-class SafeCopy a where
+class Typeable a => SafeCopy a where
     -- | The version of the type.
     --
     --   Only used as a key so it must be unique (this is checked at run-time)
@@ -162,7 +162,8 @@ instance (GPutCopy f p, GPutCopy g p) => GPutCopy (f :+: g) p where
     {-# INLINE gputCopy #-}
 
 -- | A constraint that combines 'SafeCopy' and 'Typeable'.
-type SafeCopy' a = (SafeCopy a, Typeable a)
+type SafeCopy' a = SafeCopy a
+{-# DEPRECATED SafeCopy' "SafeCopy' is now equivalent to SafeCopy " #-}
 
 -- To get the current safecopy behavior we need to emulate the
 -- template haskell code here - collect the (a -> Put) values for all
@@ -191,7 +192,7 @@ instance GPutFields f p => GPutFields (M1 S c f) p where
     gputFields p (M1 a) = gputFields p a
     {-# INLINE gputFields #-}
 
-instance SafeCopy' a => GPutFields (K1 R a) p where
+instance SafeCopy a => GPutFields (K1 R a) p where
     gputFields _ (K1 a) = do
       getSafePutGeneric putCopy a
     {-# INLINE gputFields #-}
@@ -265,7 +266,7 @@ instance GGetFields f p => GGetFields (M1 S c f) p where
       return (M1 <$> getter)
     {-# INLINE ggetFields #-}
 
-instance SafeCopy' a => GGetFields (K1 R a) p where
+instance SafeCopy a => GGetFields (K1 R a) p where
     ggetFields _ = do
       getter <- getSafeGetGeneric
       return (K1 <$> getter)
@@ -289,7 +290,7 @@ data DatatypeInfo =
 -- read a version or not.  It constructs a Map TypeRep Int32 and reads
 -- when the new TypeRep is not in the map.
 getSafeGetGeneric ::
-  forall a. SafeCopy' a
+  forall a. SafeCopy a
   => StateT (Map TypeRep Int32) Get (Get a)
 getSafeGetGeneric
     = checkConsistency proxy $
@@ -308,7 +309,7 @@ getSafeGetGeneric
 -- type prevents doing this because each fields may have a different
 -- type.  Maybe you can show me a better way
 getSafePutGeneric ::
-  forall a. SafeCopy' a
+  forall a. SafeCopy a
   => (a -> Contained Put)
   -> a
   -> RWST () [Put] (Set TypeRep) PutM ()
@@ -324,7 +325,7 @@ getSafePutGeneric cput a
                         tell [unsafeUnPack (cput $ asProxyType a proxy)]
     where proxy = Proxy :: Proxy a
 
-type GSafeCopy a = (SafeCopy' a, Generic a, GPutCopy (Rep a) DatatypeInfo, Constructors a)
+type GSafeCopy a = (SafeCopy a, Generic a, GPutCopy (Rep a) DatatypeInfo, Constructors a)
 
 -- | Generic only version of safePut. Instead of calling 'putCopy' it
 -- calls 'putCopyDefault', a copy of the implementation of the
@@ -555,14 +556,14 @@ unpureCheckConsistency proxy ks
         Consistent        -> ks
 
 {-# INLINE computeConsistency #-}
-computeConsistency :: SafeCopy a => Proxy a -> Consistency a
+computeConsistency :: forall a. SafeCopy a => Proxy a -> Consistency a
 computeConsistency proxy
     -- Match a few common cases before falling through to the general case.
     -- This allows use to generate nearly all consistencies at compile-time.
     | isObviouslyConsistent (kindFromProxy proxy)
     = Consistent
     | versions /= nub versions
-    = NotConsistent $ "Duplicate version tags: " ++ show versions
+    = NotConsistent $ "Duplicate version tags for " <> show (typeRep (Proxy @a)) <> ": " ++ show versions
     | not (validChain proxy)
     = NotConsistent "Primitive types cannot be extended as they have no version tag."
     | otherwise

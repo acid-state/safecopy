@@ -46,7 +46,7 @@ import qualified Data.Vector.Primitive as VP
 import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Unboxed as VU
 
-instance SafeCopy' a => SafeCopy (Prim a) where
+instance SafeCopy a => SafeCopy (Prim a) where
   kind = primitive
   getCopy = contain $
             do e <- unsafeUnPack getCopy
@@ -139,22 +139,22 @@ instance (SafeCopy a, SafeCopy b) => SafeCopy (a,b) where
     getCopy = contain $ liftM2 (,) safeGet safeGet
     putCopy (a,b) = contain $ safePut a >> safePut b
     errorTypeName = typeName2
-instance (SafeCopy' a, SafeCopy' b, SafeCopy' c) => SafeCopy (a,b,c) where
+instance (SafeCopy a, SafeCopy b, SafeCopy c) => SafeCopy (a,b,c) where
     getCopy = contain $ liftM3 (,,) safeGet safeGet safeGet
     putCopy (a,b,c) = contain $ safePut a >> safePut b >> safePut c
-instance (SafeCopy' a, SafeCopy' b, SafeCopy' c, SafeCopy' d) => SafeCopy (a,b,c,d) where
+instance (SafeCopy a, SafeCopy b, SafeCopy c, SafeCopy d) => SafeCopy (a,b,c,d) where
     getCopy = contain $ liftM4 (,,,) safeGet safeGet safeGet safeGet
     putCopy (a,b,c,d) = contain $ safePut a >> safePut b >> safePut c >> safePut d
-instance (SafeCopy' a, SafeCopy' b, SafeCopy' c, SafeCopy' d, SafeCopy' e) =>
+instance (SafeCopy a, SafeCopy b, SafeCopy c, SafeCopy d, SafeCopy e) =>
          SafeCopy (a,b,c,d,e) where
     getCopy = contain $ liftM5 (,,,,) safeGet safeGet safeGet safeGet safeGet
     putCopy (a,b,c,d,e) = contain $ safePut a >> safePut b >> safePut c >> safePut d >> safePut e
-instance (SafeCopy' a, SafeCopy' b, SafeCopy' c, SafeCopy' d, SafeCopy' e, SafeCopy' f) =>
+instance (SafeCopy a, SafeCopy b, SafeCopy c, SafeCopy d, SafeCopy e, SafeCopy f) =>
          SafeCopy (a,b,c,d,e,f) where
     getCopy = contain $ (,,,,,) <$> safeGet <*> safeGet <*> safeGet <*> safeGet <*> safeGet <*> safeGet
     putCopy (a,b,c,d,e,f) = contain $ safePut a >> safePut b >> safePut c >> safePut d >>
                                       safePut e >> safePut f
-instance (SafeCopy' a, SafeCopy' b, SafeCopy' c, SafeCopy' d, SafeCopy' e, SafeCopy' f, SafeCopy' g) =>
+instance (SafeCopy a, SafeCopy b, SafeCopy c, SafeCopy d, SafeCopy e, SafeCopy f, SafeCopy g) =>
          SafeCopy (a,b,c,d,e,f,g) where
     getCopy = contain $ (,,,,,,) <$> safeGet <*> safeGet <*> safeGet <*> safeGet <*>
                                      safeGet <*> safeGet <*> safeGet
@@ -449,18 +449,18 @@ putGenericVector :: (SafeCopy a, VG.Vector v a) => v a -> Contained Put
 putGenericVector v = contain $ do put (VG.length v)
                                   getSafePut >>= VG.forM_ v
 
-instance SafeCopy' a => SafeCopy (V.Vector a) where
+instance SafeCopy a => SafeCopy (V.Vector a) where
     getCopy = getGenericVector
     putCopy = putGenericVector
 
-instance (SafeCopy' a, VP.Prim a) => SafeCopy (VP.Vector a) where
+instance (SafeCopy a, VP.Prim a) => SafeCopy (VP.Vector a) where
     getCopy = getGenericVector
     putCopy = putGenericVector
 
-instance (SafeCopy' a, VS.Storable a) => SafeCopy (VS.Vector a) where
+instance (SafeCopy a, VS.Storable a) => SafeCopy (VS.Vector a) where
     getCopy = getGenericVector
     putCopy = putGenericVector
 
-instance (SafeCopy' a, VU.Unbox a) => SafeCopy (VU.Vector a) where
+instance (SafeCopy a, VU.Unbox a) => SafeCopy (VU.Vector a) where
     getCopy = getGenericVector
     putCopy = putGenericVector
