@@ -563,7 +563,7 @@ computeConsistency proxy
     | isObviouslyConsistent (kindFromProxy proxy)
     = Consistent
     | versions /= nub versions
-    = NotConsistent $ "Duplicate version tags for " <> show (typeRep (Proxy @a)) <> ": " ++ show versions
+    = NotConsistent $ "Duplicate version tags for " ++ show (typeRep (Proxy @a)) ++ ": " ++ show versions
     | not (validChain proxy)
     = NotConsistent "Primitive types cannot be extended as they have no version tag."
     | otherwise
