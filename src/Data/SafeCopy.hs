@@ -16,6 +16,8 @@
 -- can change the definition and binary format of a type nested deep within
 -- other types without problems.
 --
+-- = Migration
+--
 -- Consider this scenario. You want to store your contact list on disk
 -- and so write the following code:
 --
@@ -74,6 +76,31 @@
 -- With this, you reflect on your code and you are happy. You feel confident in the safety of
 -- your data and you know you can remove @Contacts_v0@ once you no longer wish to support
 -- that legacy format.
+--
+-- = Retiring Migrations
+--
+-- There may come a time when you have to remove @Contacts_v0@.
+-- Perhaps it uses types you want to remove from your build to
+-- decrease its size.  Perhaps it has constraints such as @Enum@ which
+-- are imposed on your new @Contacts@ type via the @SafeCopy@
+-- instance.
+--
+-- In any case, if you are using @safecopy@ incombination with
+-- @acid-state@, some care must be taken when removing @Contacts_v0@.
+-- The following steps must be taken to add a new type and remove the old:
+--
+--   1. Add the migration as described above.
+--   2. Run the server with the new migration on /all important data/.  This
+--      will cause the type to be modified in the running program.
+--   3. /Restart/ the server with the new migration on /all important data/.  This
+--      causes checkpoints to be written that only contain the new type.
+--   4. Remove the old type from your source code, changing the @kind@ of
+--      the new type from @extension@ to @base@. Build and deploy.
+--
+-- If you omit any of these steps it is a certainty that you will
+-- proceed happily with your development thinking all is grand, and
+-- then when you go to deploy your live system the migration will fail.
+
 module Data.SafeCopy
     (
       safeGet
