@@ -4,7 +4,7 @@
 -- The name of the package.
 Name:                safecopy
 Version:             0.10.4.2
-x-revision:          3
+x-revision:          4
 Synopsis:            Binary serialization with version control.
 Description:         An extension to Data.Serialize with built-in version control.
 Homepage:            https://github.com/acid-state/safecopy
@@ -29,7 +29,7 @@ tested-with:
 
 Source-repository head
   type:          git
-  location:      git@github.com:acid-state/safecopy.git
+  location:      https://github.com/acid-state/safecopy.git
 
 
 Library
