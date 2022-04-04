@@ -8,12 +8,12 @@
 #
 # For more information, see https://github.com/haskell-CI/haskell-ci
 #
-# version: 0.10
+# version: 0.14.3
 #
 version: ~> 1.0
 language: c
 os: linux
-dist: xenial
+dist: bionic
 git:
   # whether to recursively clone submodules
   submodules: false
@@ -33,23 +33,29 @@ before_cache:
   - rm -rfv $CABALHOME/packages/head.hackage
 jobs:
   include:
-    - compiler: ghc-8.10.1
-      addons: {"apt":{"sources":[{"sourceline":"deb http://ppa.launchpad.net/hvr/ghc/ubuntu xenial main","key_url":"https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x063dab2bdc0b3f9fcebc378bff3aeacef6f88286"}],"packages":["ghc-8.10.1","cabal-install-3.2"]}}
+    - compiler: ghc-9.2.2
+      addons: {"apt":{"packages":["ghc-9.2.2","cabal-install-3.6"],"sources":[{"key_url":"https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x063dab2bdc0b3f9fcebc378bff3aeacef6f88286","sourceline":"deb http://ppa.launchpad.net/hvr/ghc/ubuntu bionic main"}]}}
       os: linux
-    - compiler: ghc-8.8.3
-      addons: {"apt":{"sources":[{"sourceline":"deb http://ppa.launchpad.net/hvr/ghc/ubuntu xenial main","key_url":"https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x063dab2bdc0b3f9fcebc378bff3aeacef6f88286"}],"packages":["ghc-8.8.3","cabal-install-3.2"]}}
+    - compiler: ghc-9.0.2
+      addons: {"apt":{"packages":["ghc-9.0.2","cabal-install-3.6"],"sources":[{"key_url":"https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x063dab2bdc0b3f9fcebc378bff3aeacef6f88286","sourceline":"deb http://ppa.launchpad.net/hvr/ghc/ubuntu bionic main"}]}}
+      os: linux
+    - compiler: ghc-8.10.7
+      addons: {"apt":{"packages":["ghc-8.10.7","cabal-install-3.6"],"sources":[{"key_url":"https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x063dab2bdc0b3f9fcebc378bff3aeacef6f88286","sourceline":"deb http://ppa.launchpad.net/hvr/ghc/ubuntu bionic main"}]}}
+      os: linux
+    - compiler: ghc-8.8.4
+      addons: {"apt":{"packages":["ghc-8.8.4","cabal-install-3.6"],"sources":[{"key_url":"https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x063dab2bdc0b3f9fcebc378bff3aeacef6f88286","sourceline":"deb http://ppa.launchpad.net/hvr/ghc/ubuntu bionic main"}]}}
       os: linux
     - compiler: ghc-8.6.5
-      addons: {"apt":{"sources":[{"sourceline":"deb http://ppa.launchpad.net/hvr/ghc/ubuntu xenial main","key_url":"https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x063dab2bdc0b3f9fcebc378bff3aeacef6f88286"}],"packages":["ghc-8.6.5","cabal-install-3.2"]}}
+      addons: {"apt":{"packages":["ghc-8.6.5","cabal-install-3.6"],"sources":[{"key_url":"https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x063dab2bdc0b3f9fcebc378bff3aeacef6f88286","sourceline":"deb http://ppa.launchpad.net/hvr/ghc/ubuntu bionic main"}]}}
       os: linux
     - compiler: ghc-8.4.4
-      addons: {"apt":{"sources":[{"sourceline":"deb http://ppa.launchpad.net/hvr/ghc/ubuntu xenial main","key_url":"https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x063dab2bdc0b3f9fcebc378bff3aeacef6f88286"}],"packages":["ghc-8.4.4","cabal-install-3.2"]}}
+      addons: {"apt":{"packages":["ghc-8.4.4","cabal-install-3.6"],"sources":[{"key_url":"https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x063dab2bdc0b3f9fcebc378bff3aeacef6f88286","sourceline":"deb http://ppa.launchpad.net/hvr/ghc/ubuntu bionic main"}]}}
       os: linux
     - compiler: ghc-8.2.2
-      addons: {"apt":{"sources":[{"sourceline":"deb http://ppa.launchpad.net/hvr/ghc/ubuntu xenial main","key_url":"https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x063dab2bdc0b3f9fcebc378bff3aeacef6f88286"}],"packages":["ghc-8.2.2","cabal-install-3.2"]}}
+      addons: {"apt":{"packages":["ghc-8.2.2","cabal-install-3.6"],"sources":[{"key_url":"https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x063dab2bdc0b3f9fcebc378bff3aeacef6f88286","sourceline":"deb http://ppa.launchpad.net/hvr/ghc/ubuntu bionic main"}]}}
       os: linux
     - compiler: ghc-8.0.2
-      addons: {"apt":{"sources":[{"sourceline":"deb http://ppa.launchpad.net/hvr/ghc/ubuntu xenial main","key_url":"https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x063dab2bdc0b3f9fcebc378bff3aeacef6f88286"}],"packages":["ghc-8.0.2","cabal-install-3.2"]}}
+      addons: {"apt":{"packages":["ghc-8.0.2","cabal-install-3.6"],"sources":[{"key_url":"https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x063dab2bdc0b3f9fcebc378bff3aeacef6f88286","sourceline":"deb http://ppa.launchpad.net/hvr/ghc/ubuntu bionic main"}]}}
       os: linux
 before_install:
   - HC=$(echo "/opt/$CC/bin/ghc" | sed 's/-/\//')
@@ -72,7 +78,7 @@ before_install:
   - |
     echo "verbose: normal +nowrap +markoutput"          >> $CABALHOME/config
     echo "remote-build-reporting: anonymous"            >> $CABALHOME/config
-    echo "write-ghc-environment-files: always"          >> $CABALHOME/config
+    echo "write-ghc-environment-files: never"           >> $CABALHOME/config
     echo "remote-repo-cache: $CABALHOME/packages"       >> $CABALHOME/config
     echo "logs-dir:          $CABALHOME/logs"           >> $CABALHOME/config
     echo "world-file:        $CABALHOME/world"          >> $CABALHOME/config
@@ -99,9 +105,9 @@ install:
   - touch cabal.project
   - |
     echo "packages: ." >> cabal.project
-  - if [ $HCNUMVER -ge 80200 ] ; then echo 'package safecopy' >> cabal.project ; fi
-  - "if [ $HCNUMVER -ge 80200 ] ; then echo '  ghc-options: -Werror=missing-methods' >> cabal.project ; fi"
-  - |
+  - if [ $((HCNUMVER >= 80200)) -ne 0 ] ; then echo 'package safecopy' >> cabal.project ; fi
+  - "if [ $((HCNUMVER >= 80200)) -ne 0 ] ; then echo '  ghc-options: -Werror=missing-methods' >> cabal.project ; fi"
+  - ""
   - "for pkg in $($HCPKG list --simple-output); do echo $pkg | sed 's/-[^-]*$//' | (grep -vE -- '^(safecopy)$' || true) | sed 's/^/constraints: /' | sed 's/$/ installed/' >> cabal.project.local; done"
   - cat cabal.project || true
   - cat cabal.project.local || true
@@ -126,9 +132,9 @@ script:
   - touch cabal.project
   - |
     echo "packages: ${PKGDIR_safecopy}" >> cabal.project
-  - if [ $HCNUMVER -ge 80200 ] ; then echo 'package safecopy' >> cabal.project ; fi
-  - "if [ $HCNUMVER -ge 80200 ] ; then echo '  ghc-options: -Werror=missing-methods' >> cabal.project ; fi"
-  - |
+  - if [ $((HCNUMVER >= 80200)) -ne 0 ] ; then echo 'package safecopy' >> cabal.project ; fi
+  - "if [ $((HCNUMVER >= 80200)) -ne 0 ] ; then echo '  ghc-options: -Werror=missing-methods' >> cabal.project ; fi"
+  - ""
   - "for pkg in $($HCPKG list --simple-output); do echo $pkg | sed 's/-[^-]*$//' | (grep -vE -- '^(safecopy)$' || true) | sed 's/^/constraints: /' | sed 's/$/ installed/' >> cabal.project.local; done"
   - cat cabal.project || true
   - cat cabal.project.local || true
@@ -137,9 +143,9 @@ script:
   - ${CABAL} v2-build $WITHCOMPILER --disable-tests --disable-benchmarks all
   # Building with tests and benchmarks...
   # build & run tests, build benchmarks
-  - ${CABAL} v2-build $WITHCOMPILER ${TEST} ${BENCH} all
+  - ${CABAL} v2-build $WITHCOMPILER ${TEST} ${BENCH} all --write-ghc-environment-files=always
   # Testing...
-  - ${CABAL} v2-test $WITHCOMPILER ${TEST} ${BENCH} all
+  - ${CABAL} v2-test $WITHCOMPILER ${TEST} ${BENCH} all --test-show-details=direct
   # cabal check...
   - (cd ${PKGDIR_safecopy} && ${CABAL} -vnormal check)
   # haddock...
@@ -148,5 +154,5 @@ script:
   - rm -f cabal.project.local
   - ${CABAL} v2-build $WITHCOMPILER --disable-tests --disable-benchmarks all
 
-# REGENDATA ("0.10",["safecopy.cabal"])
+# REGENDATA ("0.14.3",["safecopy.cabal"])
 # EOF
