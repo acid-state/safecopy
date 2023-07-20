@@ -34,6 +34,8 @@ import qualified Control.Monad.Trans.State as State (get)
 import Control.Monad.Trans.RWS as RWS (evalRWST, modify, RWST, tell)
 import qualified Control.Monad.Trans.RWS as RWS (get)
 import Data.Bits (shiftR)
+import qualified Data.ByteString.Lazy.Char8 as L
+import qualified Data.ByteString.Char8 as B
 import Data.Int (Int32)
 import Data.List
 import Data.Map as Map (Map, lookup, insert)
@@ -574,6 +576,27 @@ isObviouslyConsistent :: Kind a -> Bool
 isObviouslyConsistent Primitive = True
 isObviouslyConsistent Base      = True
 isObviouslyConsistent _         = False
+
+-------------------------------------------------
+-- Some SafeCopy versions of Serialize functions.
+
+-- | Encode a value using binary serialization to a strict ByteString.
+safeEncode :: SafeCopy a => a -> B.ByteString
+safeEncode = runPut . safePut
+
+-- | Encode a value using binary serialization to a lazy ByteString.
+safeEncodeLazy :: SafeCopy a => a -> L.ByteString
+safeEncodeLazy  = runPutLazy . safePut
+
+-- | Decode a value from a strict ByteString, reconstructing the original
+-- structure.
+safeDecode :: SafeCopy a => B.ByteString -> Either String a
+safeDecode = runGet safeGet
+
+-- | Decode a value from a lazy ByteString, reconstructing the original
+-- structure.
+safeDecodeLazy :: SafeCopy a => L.ByteString -> Either String a
+safeDecodeLazy  = runGetLazy safeGet
 
 -------------------------------------------------
 -- Small utility functions that mean we don't
