@@ -44,6 +44,7 @@ import Data.Set as Set (insert, member, Set)
 import Data.Typeable (Typeable, TypeRep, typeOf, typeRep)
 import Data.Word (Word8)
 import GHC.Generics
+import GHC.Stack (HasCallStack)
 import Generic.Data as G (Constructors, gconIndex, gconNum)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -115,12 +116,12 @@ class Typeable a => SafeCopy a where
     -- | This method defines how a value should be parsed without also worrying
     --   about writing out the version tag. This function cannot be used directly.
     --   One should use 'safeGet', instead.
-    getCopy  :: Contained (Get a)
+    getCopy  :: HasCallStack => Contained (Get a)
 
     -- | This method defines how a value should be parsed without worrying about
     --   previous versions or migrations. This function cannot be used directly.
     --   One should use 'safePut, instead.
-    putCopy  :: a -> Contained Put
+    putCopy  :: HasCallStack => a -> Contained Put
 
     -- | Internal function that should not be overrided.
     --   @Consistent@ iff the version history is consistent
