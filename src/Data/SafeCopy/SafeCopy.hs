@@ -256,30 +256,30 @@ instance GGetFields f p => GGetCopy (M1 C c f) p where
 class GGetFields f p where
     ggetFields :: p -> StateT (Map TypeRep Int32) Get (Get (f a))
 
-instance (GGetFields f p, GGetFields g p) => GGetFields (f :*: g) p where
+instance (GGetFields f p, GGetFields g p, HasCallStack) => GGetFields (f :*: g) p where
     ggetFields p = do
       fgetter <- ggetFields @f p
       ggetter <- ggetFields @g p
       return ((:*:) <$> fgetter <*> ggetter)
     {-# INLINE ggetFields #-}
 
-instance GGetFields f p => GGetFields (M1 S c f) p where
+instance (GGetFields f p, HasCallStack) => GGetFields (M1 S c f) p where
     ggetFields p = do
       getter <- ggetFields p
       return (M1 <$> getter)
     {-# INLINE ggetFields #-}
 
-instance SafeCopy a => GGetFields (K1 R a) p where
+instance (SafeCopy a, HasCallStack) => GGetFields (K1 R a) p where
     ggetFields _ = do
       getter <- getSafeGetGeneric
       return (K1 <$> getter)
     {-# INLINE ggetFields #-}
 
-instance GGetFields U1 p where
+instance (GGetFields U1 p, HasCallStack) where
     ggetFields _p = pure (pure U1)
     {-# INLINE ggetFields #-}
 
-instance GGetFields V1 p where
+instance (GGetFields V1 p, HasCallStack) where
     ggetFields _p = undefined
     {-# INLINE ggetFields #-}
 
@@ -293,7 +293,7 @@ data DatatypeInfo =
 -- read a version or not.  It constructs a Map TypeRep Int32 and reads
 -- when the new TypeRep is not in the map.
 getSafeGetGeneric ::
-  forall a. SafeCopy a
+  forall a. (SafeCopy a, HasCallStack)
   => StateT (Map TypeRep Int32) Get (Get a)
 getSafeGetGeneric
     = checkConsistency proxy $
@@ -344,7 +344,7 @@ putCopyDefault :: forall a. GSafeCopy a => a -> Contained Put
 putCopyDefault a = (contain . gputCopy (ConstructorInfo (fromIntegral (gconNum @a)) (fromIntegral (gconIndex a))) . from) a
 
 -- constructGetterFromVersion :: SafeCopy a => Version a -> Kind (MigrateFrom (Reverse a)) -> Get (Get a)
-constructGetterFromVersion :: SafeCopy a => Version a -> Kind a -> Either String (Get a)
+constructGetterFromVersion :: (SafeCopy a, HasCallStack) => Version a -> Kind a -> Either String (Get a)
 constructGetterFromVersion diskVersion orig_kind =
   worker False diskVersion orig_kind
   where
