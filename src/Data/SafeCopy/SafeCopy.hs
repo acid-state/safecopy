@@ -385,14 +385,14 @@ constructGetterFromVersion diskVersion orig_kind =
 
 -- | Parse a version tagged data type and then migrate it to the desired type.
 --   Any serialized value has been extended by the return type can be parsed.
-safeGet :: SafeCopy a => Get a
+safeGet :: (SafeCopy a, HasCallStack) => Get a
 safeGet
     = join getSafeGet
 
 -- | Parse a version tag and return the corresponding migrated parser. This is
 --   useful when you can prove that multiple values have the same version.
 --   See 'getSafePut'.
-getSafeGet :: forall a. SafeCopy a => Get (Get a)
+getSafeGet :: forall a. (SafeCopy a, HasCallStack) => Get (Get a)
 getSafeGet
     = checkConsistency proxy $
       case kindFromProxy proxy of
@@ -406,14 +406,14 @@ getSafeGet
 -- | Serialize a data type by first writing out its version tag. This is much
 --   simpler than the corresponding 'safeGet' since previous versions don't
 --   come into play.
-safePut :: SafeCopy a => a -> Put
+safePut :: (SafeCopy a, HasCallStack) => a -> Put
 safePut a
     = do putter <- getSafePut
          putter a
 
 -- | Serialize the version tag and return the associated putter. This is useful
 --   when serializing multiple values with the same version. See 'getSafeGet'.
-getSafePut :: forall a. SafeCopy a => PutM (a -> Put)
+getSafePut :: forall a. (SafeCopy a, HasCallStack) => PutM (a -> Put)
 getSafePut
     = unpureCheckConsistency proxy $
       case kindFromProxy proxy of
@@ -582,21 +582,21 @@ isObviouslyConsistent _         = False
 -- Some SafeCopy versions of Serialize functions.
 
 -- | Encode a value using binary serialization to a strict ByteString.
-safeEncode :: SafeCopy a => a -> B.ByteString
+safeEncode :: (SafeCopy a, HasCallStack) => a -> B.ByteString
 safeEncode = runPut . safePut
 
 -- | Encode a value using binary serialization to a lazy ByteString.
-safeEncodeLazy :: SafeCopy a => a -> L.ByteString
+safeEncodeLazy :: (SafeCopy a, HasCallStack) => a -> L.ByteString
 safeEncodeLazy  = runPutLazy . safePut
 
 -- | Decode a value from a strict ByteString, reconstructing the original
 -- structure.
-safeDecode :: SafeCopy a => B.ByteString -> Either String a
+safeDecode :: (SafeCopy a, HasCallStack) => B.ByteString -> Either String a
 safeDecode = runGet safeGet
 
 -- | Decode a value from a lazy ByteString, reconstructing the original
 -- structure.
-safeDecodeLazy :: SafeCopy a => L.ByteString -> Either String a
+safeDecodeLazy :: (SafeCopy a, HasCallStack) => L.ByteString -> Either String a
 safeDecodeLazy  = runGetLazy safeGet
 
 -------------------------------------------------
