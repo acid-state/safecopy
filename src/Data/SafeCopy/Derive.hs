@@ -1,10 +1,5 @@
 {-# LANGUAGE TemplateHaskell, CPP #-}
 
--- Hack for bug in older Cabal versions
-#ifndef MIN_VERSION_template_haskell
-#define MIN_VERSION_template_haskell(x,y,z) 1
-#endif
-
 module Data.SafeCopy.Derive where
 
 import Data.Serialize (getWord8, putWord8, label)

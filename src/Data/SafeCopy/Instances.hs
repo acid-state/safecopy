@@ -1,13 +1,11 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable, FlexibleContexts, UndecidableInstances, TypeFamilies #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module Data.SafeCopy.Instances where
 
 import Data.SafeCopy.SafeCopy
 
-#if !MIN_VERSION_base(4,8,0)
-import           Control.Applicative
-#endif
 import           Control.Monad
 import qualified Data.Array as Array
 import qualified Data.Array.Unboxed as UArray

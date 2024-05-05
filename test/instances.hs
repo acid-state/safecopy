@@ -5,11 +5,6 @@
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
--- Hack for bug in older Cabal versions
-#ifndef MIN_VERSION_template_haskell
-#define MIN_VERSION_template_haskell(x,y,z) 1
-#endif
-
 import Control.Applicative
 import Control.Lens           (transformOn, transformOnOf)
 import Control.Lens.Traversal (Traversal')
@@ -33,40 +28,11 @@ import qualified Data.Vector.Primitive as VP
 import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Unboxed as VU
 
-#if ! MIN_VERSION_QuickCheck(2,9,0)
-instance (Arbitrary a, Arbitrary b, Arbitrary c, Arbitrary d, Arbitrary e, Arbitrary f) =>
-         Arbitrary (a,b,c,d,e,f) where
-   arbitrary = (,,,,,) <$> arbitrary <*> arbitrary <*> arbitrary <*>
-                           arbitrary <*> arbitrary <*> arbitrary
-
-instance (Arbitrary a, Arbitrary b, Arbitrary c, Arbitrary d, Arbitrary e, Arbitrary f, Arbitrary g) =>
-         Arbitrary (a,b,c,d,e,f,g) where
-   arbitrary = (,,,,,,) <$> arbitrary <*> arbitrary <*> arbitrary <*>
-                            arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
-#endif
-
-#if ! MIN_VERSION_QuickCheck(2,8,2)
-instance (Arbitrary a) => Arbitrary (V.Vector a) where
-   arbitrary = V.fromList <$> arbitrary
-
-instance (Arbitrary a, VP.Prim a) => Arbitrary (VP.Vector a) where
-   arbitrary = VP.fromList <$> arbitrary
-
-instance (Arbitrary a, VS.Storable a) => Arbitrary (VS.Vector a) where
-   arbitrary = VS.fromList <$> arbitrary
-
-instance (Arbitrary a, VU.Unbox a) => Arbitrary (VU.Vector a) where
-   arbitrary = VU.fromList <$> arbitrary
-#endif
-
 deriving instance (Arbitrary a) => Arbitrary (Prim a)
 deriving instance (Eq a) => Eq (Prim a)
 deriving instance (Show a) => Show (Prim a)
 
 deriving instance Eq ZonedTime
-#if ! MIN_VERSION_time(1,6,0)
-deriving instance Show UniversalTime
-#endif
 
 -- | Equality on the 'Right' value, showing the unequal value on failure;
 -- or explicit failure using the 'Left' message without equality testing.
@@ -106,25 +72,14 @@ do let a = conT ''Int
 
    safecopy <- reify ''SafeCopy
    preds <- 'prop_inverse ^!! act reify . (template :: Traversal' Info Pred)
-#if !MIN_VERSION_template_haskell(2,10,0)
-   classes <- mapM reify [ name | ClassP name _ <- preds ]
-#else
---   print preds
-
    classes <-
          case preds of
            [ForallT _ cxt' _] ->
               mapM reify [ name | AppT (ConT name) _ <- cxt' ]
            _ -> error "FIXME: fix this code to handle this case."
---   classes <- mapM reify [ ]
-#endif
    def <- a
 
-#if MIN_VERSION_template_haskell(2,11,0)
    let instances (ClassI _ decs) = [ typ | InstanceD _ _ (AppT _ typ) _ <- decs ]
-#else
-   let instances (ClassI _ decs) = [ typ | InstanceD _ (AppT _ typ) _ <- decs ]
-#endif
        instances _ = []
        types = map instances classes
 
@@ -148,11 +103,6 @@ do let a = conT ''Int
                ($(downsize typ) (prop_inverse :: $(return typ) -> Property)) |]
 
        props = listE . map prop
-
-#if !MIN_VERSION_template_haskell(2,8,0)
-       -- 'report' throws warnings in template-haskell-2.8.0.0
-       reportWarning = report False
-#endif
 
    mapM_ (\typ -> reportWarning $ "not tested: " ++ name typ) untested
 
