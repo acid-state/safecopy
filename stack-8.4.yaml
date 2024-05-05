@@ -1,0 +1,5 @@
+resolver: lts-12.26
+
+extra-deps:
+- generic-data-0.3.0.0
+- base-orphans-0.8
