@@ -11,11 +11,12 @@
 #endif
 
 import Control.Applicative
-import Control.Lens
-import Control.Lens.Action
+import Control.Lens           (transformOn, transformOnOf)
+import Control.Lens.Traversal (Traversal')
+import Control.Lens.Action    ((^!!), act)
 import Data.Array (Array)
 import Data.Array.Unboxed (UArray)
-import Data.Data.Lens
+import Data.Data.Lens         (template)
 import Data.Fixed (Fixed, E1)
 import Data.List
 import Data.SafeCopy
