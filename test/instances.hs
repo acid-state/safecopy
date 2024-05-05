@@ -20,7 +20,6 @@ import Data.Time (UniversalTime(..), ZonedTime(..))
 import Data.Tree (Tree)
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
-import Test.QuickCheck.Instances ()
 import Test.Tasty
 import Test.Tasty.QuickCheck hiding (Fixed, (===))
 import qualified Data.Vector as V
