@@ -42,6 +42,7 @@ import Data.Set as Set (insert, member, Set)
 import Data.Typeable (Typeable, TypeRep, typeOf, typeRep)
 import Data.Word (Word8)
 import GHC.Generics
+import GHC.Stack (HasCallStack)
 import Generic.Data as G (Constructors, gconIndex, gconNum)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -113,12 +114,12 @@ class Typeable a => SafeCopy a where
     -- | This method defines how a value should be parsed without also worrying
     --   about writing out the version tag. This function cannot be used directly.
     --   One should use 'safeGet', instead.
-    getCopy  :: Contained (Get a)
+    getCopy  :: HasCallStack => Contained (Get a)
 
     -- | This method defines how a value should be parsed without worrying about
     --   previous versions or migrations. This function cannot be used directly.
     --   One should use 'safePut, instead.
-    putCopy  :: a -> Contained Put
+    putCopy  :: HasCallStack => a -> Contained Put
 
     -- | Internal function that should not be overrided.
     --   @Consistent@ iff the version history is consistent
@@ -251,7 +252,7 @@ instance GGetFields f p => GGetCopy (M1 C c f) p where
 
 -- append constructor fields
 class GGetFields f p where
-    ggetFields :: p -> StateT (Map TypeRep Int32) Get (Get (f a))
+    ggetFields :: HasCallStack => p -> StateT (Map TypeRep Int32) Get (Get (f a))
 
 instance (GGetFields f p, GGetFields g p) => GGetFields (f :*: g) p where
     ggetFields p = do
@@ -290,7 +291,7 @@ data DatatypeInfo =
 -- read a version or not.  It constructs a Map TypeRep Int32 and reads
 -- when the new TypeRep is not in the map.
 getSafeGetGeneric ::
-  forall a. SafeCopy a
+  forall a. (SafeCopy a, HasCallStack)
   => StateT (Map TypeRep Int32) Get (Get a)
 getSafeGetGeneric
     = checkConsistency proxy $
@@ -341,7 +342,7 @@ putCopyDefault :: forall a. GSafeCopy a => a -> Contained Put
 putCopyDefault a = (contain . gputCopy (ConstructorInfo (fromIntegral (gconNum @a)) (fromIntegral (gconIndex a))) . from) a
 
 -- constructGetterFromVersion :: SafeCopy a => Version a -> Kind (MigrateFrom (Reverse a)) -> Get (Get a)
-constructGetterFromVersion :: SafeCopy a => Version a -> Kind a -> Either String (Get a)
+constructGetterFromVersion :: (SafeCopy a, HasCallStack) => Version a -> Kind a -> Either String (Get a)
 constructGetterFromVersion diskVersion orig_kind =
   worker False diskVersion orig_kind
   where
@@ -382,14 +383,14 @@ constructGetterFromVersion diskVersion orig_kind =
 
 -- | Parse a version tagged data type and then migrate it to the desired type.
 --   Any serialized value has been extended by the return type can be parsed.
-safeGet :: SafeCopy a => Get a
+safeGet :: (SafeCopy a, HasCallStack) => Get a
 safeGet
     = join getSafeGet
 
 -- | Parse a version tag and return the corresponding migrated parser. This is
 --   useful when you can prove that multiple values have the same version.
 --   See 'getSafePut'.
-getSafeGet :: forall a. SafeCopy a => Get (Get a)
+getSafeGet :: forall a. (SafeCopy a, HasCallStack) => Get (Get a)
 getSafeGet
     = checkConsistency proxy $
       case kindFromProxy proxy of
@@ -403,14 +404,14 @@ getSafeGet
 -- | Serialize a data type by first writing out its version tag. This is much
 --   simpler than the corresponding 'safeGet' since previous versions don't
 --   come into play.
-safePut :: SafeCopy a => a -> Put
+safePut :: (SafeCopy a, HasCallStack) => a -> Put
 safePut a
     = do putter <- getSafePut
          putter a
 
 -- | Serialize the version tag and return the associated putter. This is useful
 --   when serializing multiple values with the same version. See 'getSafeGet'.
-getSafePut :: forall a. SafeCopy a => PutM (a -> Put)
+getSafePut :: forall a. (SafeCopy a, HasCallStack) => PutM (a -> Put)
 getSafePut
     = unpureCheckConsistency proxy $
       case kindFromProxy proxy of
