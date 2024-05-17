@@ -1,6 +1,6 @@
 Name:                safecopy
 Version:             0.10.4.2
-x-revision:          8
+x-revision:          10
 Synopsis:            Binary serialization with version control.
 Description:         An extension to Data.Serialize with built-in version control.
 Homepage:            https://github.com/acid-state/safecopy
@@ -14,7 +14,7 @@ Extra-source-files: CHANGELOG.md
 Cabal-version:       >=1.10
 
 tested-with:
-  GHC == 9.10.0
+  GHC == 9.10.1
   GHC == 9.8.2
   GHC == 9.6.5
   GHC == 9.4.8
@@ -74,6 +74,7 @@ Test-suite instances
                        lens-action
                      , tasty
                      , tasty-quickcheck
+                     , quickcheck-instances
                      , QuickCheck >= 2.8.2 && < 3
 
 Test-suite generic
