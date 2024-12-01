@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, LambdaCase, CPP #-}
+{-# LANGUAGE TemplateHaskell, LambdaCase, FlexibleInstances, CPP #-}
 
 module Data.SafeCopy.Derive where
 
@@ -259,6 +259,14 @@ tyVarName (PlainTV n) = n
 tyVarName (KindedTV n _) = n
 #endif
 
+class ExtraContext a where
+  extraContext :: a -> Q Cxt
+
+-- | Generate SafeCopy constraints for a list of type variables
+instance ExtraContext [TyVarBndr] where
+  extraContext tyvars =
+    pure $ fmap (\var -> AppT (ConT ''SafeCopy) (VarT $ tyVarName var)) tyvars
+
 internalDeriveSafeCopy :: DeriveType -> Version a -> Name -> TypeQ -> Q [Dec]
 internalDeriveSafeCopy deriveType versionId kindName typq = do
   typq >>= \case
@@ -267,7 +275,9 @@ internalDeriveSafeCopy deriveType versionId kindName typq = do
         TyConI (DataD context _name tyvars _kind cons _derivs)
           | length cons > 255 -> fail $ "Can't derive SafeCopy instance for: " ++ show tyName ++
                                         ". The datatype must have less than 256 constructors."
-          | otherwise         -> worker1 deriveType versionId kindName tyName typ context tyvars (zip [0..] cons)
+          | otherwise -> do
+              extra <- extraContext tyvars
+              worker1 deriveType versionId kindName tyName typ (context ++ extra) tyvars (zip [0..] cons)
 
         TyConI (NewtypeD context _name tyvars _kind con _derivs) ->
           worker1 deriveType versionId kindName tyName typ context tyvars [(0, con)]
@@ -295,8 +305,7 @@ worker1 :: DeriveType -> Version a -> Name -> Name -> Type -> Cxt -> [TyVarBndr]
 worker1 deriveType versionId kindName tyName tyBase context tyvars cons =
   let ty = foldl AppT tyBase (fmap (\var -> VarT $ tyVarName var) tyvars)
       typeNameStr = pprWithoutSuffixes ppr (ConT tyName)
-      extraContext = fmap (\var -> AppT (ConT ''SafeCopy) (VarT $ tyVarName var)) tyvars
-  in (:[]) <$> instanceD (cxt (fmap pure (extraContext ++ context)))
+  in (:[]) <$> instanceD (cxt (fmap pure context))
                          (pure (ConT ''SafeCopy `AppT` ty))
                          [ mkPutCopy deriveType cons
                          , mkGetCopy deriveType typeNameStr cons
@@ -310,8 +319,7 @@ worker2 _ _ _ _ itype tyBase _ _ _ | itype /= tyBase =
 worker2 deriveType versionId kindName tyIndex' _ tyBase context tyvars cons = do
   let ty = foldl AppT tyBase (fmap (\var -> VarT $ tyVarName var) tyvars)
       typeNameStr = unwords (pprWithoutSuffixes ppr ty  : map show tyIndex')
-      extraContext = fmap (\var -> AppT (ConT ''SafeCopy) (VarT $ tyVarName var)) tyvars
-  (:[]) <$> instanceD (cxt (fmap pure (extraContext ++ context)))
+  (:[]) <$> instanceD (cxt (fmap pure context))
                       (pure (ConT ''SafeCopy `AppT` ty))
                       [ mkPutCopy deriveType cons
                       , mkGetCopy deriveType typeNameStr cons
