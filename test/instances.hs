@@ -1,71 +1,42 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
--- Hack for bug in older Cabal versions
-#ifndef MIN_VERSION_template_haskell
-#define MIN_VERSION_template_haskell(x,y,z) 1
-#endif
-
 import Control.Applicative
-import Control.Lens
-import Control.Lens.Action
+import Control.Lens           (transformOn, transformOnOf)
+import Control.Lens.Traversal (Traversal')
+import Control.Lens.Action    ((^!!), act)
 import Data.Array (Array)
 import Data.Array.Unboxed (UArray)
-import Data.Data.Lens
+import Data.Data.Lens         (template)
 import Data.Fixed (Fixed, E1)
 import Data.List
 import Data.SafeCopy
+import Data.SafeCopy.Internal (pprWithoutSuffixes)
 import Data.Serialize (runPut, runGet)
 import Data.Time (UniversalTime(..), ZonedTime(..))
 import Data.Tree (Tree)
+import Data.Typeable (Typeable)
 import Language.Haskell.TH
+import Language.Haskell.TH.Instances ()
 import Language.Haskell.TH.Syntax
-import Test.QuickCheck.Instances ()
 import Test.Tasty
+import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck hiding (Fixed, (===))
 import qualified Data.Vector as V
 import qualified Data.Vector.Primitive as VP
 import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Unboxed as VU
 
-#if ! MIN_VERSION_QuickCheck(2,9,0)
-instance (Arbitrary a, Arbitrary b, Arbitrary c, Arbitrary d, Arbitrary e, Arbitrary f) =>
-         Arbitrary (a,b,c,d,e,f) where
-   arbitrary = (,,,,,) <$> arbitrary <*> arbitrary <*> arbitrary <*>
-                           arbitrary <*> arbitrary <*> arbitrary
-
-instance (Arbitrary a, Arbitrary b, Arbitrary c, Arbitrary d, Arbitrary e, Arbitrary f, Arbitrary g) =>
-         Arbitrary (a,b,c,d,e,f,g) where
-   arbitrary = (,,,,,,) <$> arbitrary <*> arbitrary <*> arbitrary <*>
-                            arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
-#endif
-
-#if ! MIN_VERSION_QuickCheck(2,8,2)
-instance (Arbitrary a) => Arbitrary (V.Vector a) where
-   arbitrary = V.fromList <$> arbitrary
-
-instance (Arbitrary a, VP.Prim a) => Arbitrary (VP.Vector a) where
-   arbitrary = VP.fromList <$> arbitrary
-
-instance (Arbitrary a, VS.Storable a) => Arbitrary (VS.Vector a) where
-   arbitrary = VS.fromList <$> arbitrary
-
-instance (Arbitrary a, VU.Unbox a) => Arbitrary (VU.Vector a) where
-   arbitrary = VU.fromList <$> arbitrary
-#endif
-
 deriving instance (Arbitrary a) => Arbitrary (Prim a)
 deriving instance (Eq a) => Eq (Prim a)
 deriving instance (Show a) => Show (Prim a)
 
 deriving instance Eq ZonedTime
-#if ! MIN_VERSION_time(1,6,0)
-deriving instance Show UniversalTime
-#endif
 
 -- | Equality on the 'Right' value, showing the unequal value on failure;
 -- or explicit failure using the 'Left' message without equality testing.
@@ -105,25 +76,14 @@ do let a = conT ''Int
 
    safecopy <- reify ''SafeCopy
    preds <- 'prop_inverse ^!! act reify . (template :: Traversal' Info Pred)
-#if !MIN_VERSION_template_haskell(2,10,0)
-   classes <- mapM reify [ name | ClassP name _ <- preds ]
-#else
---   print preds
-
    classes <-
          case preds of
            [ForallT _ cxt' _] ->
               mapM reify [ name | AppT (ConT name) _ <- cxt' ]
            _ -> error "FIXME: fix this code to handle this case."
---   classes <- mapM reify [ ]
-#endif
    def <- a
 
-#if MIN_VERSION_template_haskell(2,11,0)
    let instances (ClassI _ decs) = [ typ | InstanceD _ _ (AppT _ typ) _ <- decs ]
-#else
-   let instances (ClassI _ decs) = [ typ | InstanceD _ (AppT _ typ) _ <- decs ]
-#endif
        instances _ = []
        types = map instances classes
 
@@ -148,11 +108,6 @@ do let a = conT ''Int
 
        props = listE . map prop
 
-#if !MIN_VERSION_template_haskell(2,8,0)
-       -- 'report' throws warnings in template-haskell-2.8.0.0
-       reportWarning = report False
-#endif
-
    mapM_ (\typ -> reportWarning $ "not tested: " ++ name typ) untested
 
    [d| inversions :: [TestTree]
@@ -161,4 +116,24 @@ do let a = conT ''Int
 main :: IO ()
 main = defaultMain $ testGroup "SafeCopy instances"
     [ testGroup "decode is the inverse of encode" inversions
+    , testGroup "deriveSafeCopy'"
+      [ testCase "deriveSafeCopy 0 'base ''(,,,,,,,)" $ do
+          let decs = $(lift =<< deriveSafeCopy 0 'base ''(,,,,,,,))
+          pprWithoutSuffixes ppr decs @?= intercalate "\n"
+            ["instance (SafeCopy a, SafeCopy b, SafeCopy c, SafeCopy d, SafeCopy e, SafeCopy f, SafeCopy g, SafeCopy h) => SafeCopy ((,,,,,,,) a b c d e f g h)",
+             "    where putCopy ((,,,,,,,) a1 a2 a3 a4 a5 a6 a7 a8) = contain (do {safePut_a <- getSafePut; safePut_b <- getSafePut; safePut_c <- getSafePut; safePut_d <- getSafePut; safePut_e <- getSafePut; safePut_f <- getSafePut; safePut_g <- getSafePut; safePut_h <- getSafePut; safePut_a a1; safePut_b a2; safePut_c a3; safePut_d a4; safePut_e a5; safePut_f a6; safePut_g a7; safePut_h a8; return ()})",
+             "          getCopy = contain (label \"(,,,,,,,):\" (do {safeGet_a <- getSafeGet; safeGet_b <- getSafeGet; safeGet_c <- getSafeGet; safeGet_d <- getSafeGet; safeGet_e <- getSafeGet; safeGet_f <- getSafeGet; safeGet_g <- getSafeGet; safeGet_h <- getSafeGet; (((((((return (,,,,,,,) <*> safeGet_a) <*> safeGet_b) <*> safeGet_c) <*> safeGet_d) <*> safeGet_e) <*> safeGet_f) <*> safeGet_g) <*> safeGet_h}))",
+             "          version = 0",
+             "          kind = base",
+             "          errorTypeName _ = \"(,,,,,,,)\""]
+      , testCase "deriveSafeCopy' 0 'base [t(,,,,,,,)|]" $ do
+          let decs = $(lift =<< deriveSafeCopy' 0 'base [t|forall a b c d e f g h. (Show a, Typeable a, SafeCopy a, SafeCopy b, SafeCopy c, SafeCopy d, SafeCopy e, SafeCopy f, SafeCopy g, SafeCopy h) => (a,b,c,d,e,f,g,h)|])
+          pprWithoutSuffixes ppr decs @?= intercalate "\n"
+            ["instance (Show a, Typeable a, SafeCopy a, SafeCopy b, SafeCopy c, SafeCopy d, SafeCopy e, SafeCopy f, SafeCopy g, SafeCopy h) => SafeCopy ((,,,,,,,) a b c d e f g h)",
+             "    where putCopy ((,,,,,,,) a1 a2 a3 a4 a5 a6 a7 a8) = contain (do {safePut_a <- getSafePut; safePut_b <- getSafePut; safePut_c <- getSafePut; safePut_d <- getSafePut; safePut_e <- getSafePut; safePut_f <- getSafePut; safePut_g <- getSafePut; safePut_h <- getSafePut; safePut_a a1; safePut_b a2; safePut_c a3; safePut_d a4; safePut_e a5; safePut_f a6; safePut_g a7; safePut_h a8; return ()})",
+             "          getCopy = contain (label \"(,,,,,,,):\" (do {safeGet_a <- getSafeGet; safeGet_b <- getSafeGet; safeGet_c <- getSafeGet; safeGet_d <- getSafeGet; safeGet_e <- getSafeGet; safeGet_f <- getSafeGet; safeGet_g <- getSafeGet; safeGet_h <- getSafeGet; (((((((return (,,,,,,,) <*> safeGet_a) <*> safeGet_b) <*> safeGet_c) <*> safeGet_d) <*> safeGet_e) <*> safeGet_f) <*> safeGet_g) <*> safeGet_h}))",
+             "          version = 0",
+             "          kind = base",
+             "          errorTypeName _ = \"(,,,,,,,)\""]
+      ]
     ]

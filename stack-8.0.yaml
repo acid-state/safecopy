@@ -1,0 +1,10 @@
+resolver: lts-9.21
+
+extra-deps:
+- generic-data-0.3.0.0
+- base-orphans-0.8
+- show-combinators-0.1.0.0
+
+allow-newer: true
+allow-newer-deps:
+- profunctors

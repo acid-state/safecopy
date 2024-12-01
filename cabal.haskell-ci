@@ -1,18 +1,11 @@
 branches: master
 installed: +all
 
-constraint-set bytestring-0.12
-  ghc: >= 8.2
-  constraints: bytestring ^>= 0.12
-  tests: True
-  run-tests: True
-
-constraint-set text-2.1
-  ghc: >= 8.2
-  constraints: text ^>= 2.1
+constraint-set lens-5.3.1
+  ghc: >= 8.0 && < 9.10
+  constraints: lens ^>= 5.3.1
   tests: True
   run-tests: True
 
 raw-project
-  allow-newer: bytestring
-  allow-newer: text
+  allow-newer: lens
