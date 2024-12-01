@@ -293,10 +293,10 @@ internalDeriveSafeCopyIndexedType deriveType versionId kindName typq tyIndex' = 
 
 worker1 :: DeriveType -> Version a -> Name -> Name -> Type -> Cxt -> [TyVarBndr] -> [(Integer, Con)] -> Q [Dec]
 worker1 deriveType versionId kindName tyName tyBase context tyvars cons =
-  let ty = foldl AppT tyBase [ VarT $ tyVarName var | var <- tyvars ]
+  let ty = foldl AppT tyBase (fmap (\var -> VarT $ tyVarName var) tyvars)
       typeNameStr = pprWithoutSuffixes ppr (ConT tyName)
-      safeCopyClass args = foldl appT (conT ''SafeCopy) args
-  in (:[]) <$> instanceD (cxt $ [safeCopyClass [varT $ tyVarName var] | var <- tyvars] ++ map return context)
+      extraContext = fmap (\var -> AppT (ConT ''SafeCopy) (VarT $ tyVarName var)) tyvars
+  in (:[]) <$> instanceD (cxt (fmap pure (extraContext ++ context)))
                          (pure (ConT ''SafeCopy `AppT` ty))
                          [ mkPutCopy deriveType cons
                          , mkGetCopy deriveType typeNameStr cons
@@ -308,10 +308,10 @@ worker2 :: DeriveType -> Version a -> Name -> [Name] -> Type -> Type -> Cxt -> [
 worker2 _ _ _ _ itype tyBase _ _ _ | itype /= tyBase =
   fail $ "Expected " <> show itype <> ", but found " <> show tyBase
 worker2 deriveType versionId kindName tyIndex' _ tyBase context tyvars cons = do
-  let ty = foldl AppT tyBase [ VarT $ tyVarName var | var <- tyvars ]
+  let ty = foldl AppT tyBase (fmap (\var -> VarT $ tyVarName var) tyvars)
       typeNameStr = unwords (pprWithoutSuffixes ppr ty  : map show tyIndex')
-      safeCopyClass args = foldl appT (conT ''SafeCopy) args
-  (:[]) <$> instanceD (cxt $ [safeCopyClass [varT $ tyVarName var] | var <- tyvars] ++ map return context)
+      extraContext = fmap (\var -> AppT (ConT ''SafeCopy) (VarT $ tyVarName var)) tyvars
+  (:[]) <$> instanceD (cxt (fmap pure (extraContext ++ context)))
                       (pure (ConT ''SafeCopy `AppT` ty))
                       [ mkPutCopy deriveType cons
                       , mkGetCopy deriveType typeNameStr cons
