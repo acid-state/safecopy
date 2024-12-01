@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -15,12 +16,15 @@ import Data.Data.Lens         (template)
 import Data.Fixed (Fixed, E1)
 import Data.List
 import Data.SafeCopy
+import Data.SafeCopy.Internal (pprWithoutSuffixes)
 import Data.Serialize (runPut, runGet)
 import Data.Time (UniversalTime(..), ZonedTime(..))
 import Data.Tree (Tree)
 import Language.Haskell.TH
+import Language.Haskell.TH.Instances ()
 import Language.Haskell.TH.Syntax
 import Test.Tasty
+import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck hiding (Fixed, (===))
 import qualified Data.Vector as V
 import qualified Data.Vector.Primitive as VP
@@ -111,4 +115,15 @@ do let a = conT ''Int
 main :: IO ()
 main = defaultMain $ testGroup "SafeCopy instances"
     [ testGroup "decode is the inverse of encode" inversions
+    , testGroup "deriveSafeCopy'"
+      [ testCase "deriveSafeCopy 0 'base ''(,,,,,,,)" $ do
+          let decs = $(lift =<< deriveSafeCopy 0 'base ''(,,,,,,,))
+          pprWithoutSuffixes ppr decs @?= intercalate "\n"
+                                    ["instance (SafeCopy a, SafeCopy b, SafeCopy c, SafeCopy d, SafeCopy e, SafeCopy f, SafeCopy g, SafeCopy h) => SafeCopy ((,,,,,,,) a b c d e f g h)",
+                                     "    where putCopy ((,,,,,,,) a1 a2 a3 a4 a5 a6 a7 a8) = contain (do {safePut_a <- getSafePut; safePut_b <- getSafePut; safePut_c <- getSafePut; safePut_d <- getSafePut; safePut_e <- getSafePut; safePut_f <- getSafePut; safePut_g <- getSafePut; safePut_h <- getSafePut; safePut_a a1; safePut_b a2; safePut_c a3; safePut_d a4; safePut_e a5; safePut_f a6; safePut_g a7; safePut_h a8; return ()})",
+                                     "          getCopy = contain (label \"(,,,,,,,):\" (do {safeGet_a <- getSafeGet; safeGet_b <- getSafeGet; safeGet_c <- getSafeGet; safeGet_d <- getSafeGet; safeGet_e <- getSafeGet; safeGet_f <- getSafeGet; safeGet_g <- getSafeGet; safeGet_h <- getSafeGet; (((((((return (,,,,,,,) <*> safeGet_a) <*> safeGet_b) <*> safeGet_c) <*> safeGet_d) <*> safeGet_e) <*> safeGet_f) <*> safeGet_g) <*> safeGet_h}))",
+                                     "          version = 0",
+                                     "          kind = base",
+                                     "          errorTypeName _ = \"(,,,,,,,)\""]
+      ]
     ]

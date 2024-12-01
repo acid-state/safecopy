@@ -7,10 +7,17 @@ import Data.SafeCopy.SafeCopy
 
 import Language.Haskell.TH hiding (Kind)
 import Control.Monad
+import Data.Data (Data)
+import Data.Generics (everywhere, mkT)
 import Data.Maybe (fromMaybe)
 #ifdef __HADDOCK__
 import Data.Word (Word8) -- Haddock
 #endif
+import Debug.Trace (traceShowId)
+import Language.Haskell.TH.PprLib (Doc, to_HPJ_Doc)
+import Language.Haskell.TH.Syntax
+import qualified Text.PrettyPrint as HPJ
+import Text.Regex.TDFA ((=~), MatchResult(MR))
 
 -- | Derive an instance of 'SafeCopy'.
 --
@@ -251,26 +258,27 @@ internalDeriveSafeCopy' deriveType versionId kindName tyName info = do
               worker' (return nty) context [] [(0, con)]
 #else
           DataInstD context _name ty _kind cons _derivs ->
-              worker' (foldl appT (conT tyName) (map return ty)) context [] (zip [0..] cons)
+              worker' (foldl AppT (ConT tyName) ty) context [] (zip [0..] cons)
 
           NewtypeInstD context _name ty _kind con _derivs ->
-              worker' (foldl appT (conT tyName) (map return ty)) context [] [(0, con)]
+              worker' (foldl AppT (ConT tyName) ty) context [] [(0, con)]
 #endif
           _ -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, inst)
       return $ concat decs
     _ -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info)
   where
-    worker = worker' (conT tyName)
+    worker = worker' (ConT tyName)
     worker' tyBase context tyvars cons =
-      let ty = foldl appT tyBase [ varT $ tyVarName var | var <- tyvars ]
+      let ty = foldl AppT tyBase [ VarT $ tyVarName var | var <- tyvars ]
+          typeNameStr = pprWithoutSuffixes ppr (ConT tyName)
           safeCopyClass args = foldl appT (conT ''SafeCopy) args
       in (:[]) <$> instanceD (cxt $ [safeCopyClass [varT $ tyVarName var] | var <- tyvars] ++ map return context)
-                                       (conT ''SafeCopy `appT` ty)
+                                       (pure (ConT ''SafeCopy `AppT` ty))
                                        [ mkPutCopy deriveType cons
-                                       , mkGetCopy deriveType (show tyName) cons
+                                       , mkGetCopy deriveType typeNameStr cons
                                        , valD (varP 'version) (normalB $ litE $ integerL $ fromIntegral $ unVersion versionId) []
                                        , valD (varP 'kind) (normalB (varE kindName)) []
-                                       , funD 'errorTypeName [clause [wildP] (normalB $ litE $ StringL (show tyName)) []]
+                                       , funD 'errorTypeName [clause [wildP] (normalB $ litE $ StringL typeNameStr) []]
                                        ]
 
 internalDeriveSafeCopyIndexedType :: DeriveType -> Version a -> Name -> Name -> [Name] -> Q [Dec]
@@ -437,3 +445,80 @@ typeName ListT       = "List"
 typeName (AppT t u)  = typeName t ++ typeName u
 typeName (SigT t _k) = typeName t
 typeName _           = "_"
+
+-- | Apply the TH pretty printer to a value after stripping any added
+-- suffixes from its names.  This may make it uncompilable, but it
+-- eliminates a source of randomness in the expected and actual test
+-- case results.
+pprWithoutSuffixes :: Data a => (a -> Doc) -> a -> String
+pprWithoutSuffixes pretty decs =
+  fixNames $
+  HPJ.renderStyle (HPJ.style {HPJ.lineLength = 1000000 {-HPJ.mode = HPJ.OneLineMode-}}) $
+  to_HPJ_Doc $
+  pretty $
+  everywhere (mkT unsafeName) $
+  {-fixText-} decs
+
+-- | Turn this:
+-- @@
+--   (Name (mkOccName "AppraisalValue")
+--     (NameG TcClsName (mkPkgName "appra_B8Hqp4MOZTzG2RIYHT6sPz")
+--        (mkModName "Appraisal.ReportTH")))
+-- @@
+-- into this:
+-- @@
+--   $(lift 'Appraisal.ReportTH.AppraisalValue).
+-- @@
+-- This is applied to all declarations in the generated splice file.
+fixNames :: String -> String
+fixNames s =
+    let s' = fixStrings s in
+    case (s' =~ "\\(Name \\(mkOccName \\\"([^\"]*)\"\\) \\((NameG ([^ ]*) \\(mkPkgName \\\"([^\"]*)\\\"\\) \\(mkModName \\\"([^\"]*)\\\"\\)|NameU [0-9]*)\\)\\)" :: MatchResult String) of
+      MR before _ after [name, _, "", "", ""] _ -> before <> "(mkName " <> show name <> ") " <> fixNames after
+      MR before _ after [name, _, "VarName", _, _modpath] _ -> before <>  "'" <> name <> fixNames after
+      MR before _ after [name, _, "DataName", _, _modpath] _ -> before <>  "''" <> name <> fixNames after
+      MR before _ after [name, _, "TcClsName", _, _modpath] _ -> before <>  "''" <> name <> fixNames after -- I think this is right
+      MR before _ _ _ _ -> before
+
+fixStrings :: String -> String
+fixStrings s =
+    let MR before _ after xs _ = s =~ ("\\[((" <> ws <> ch <> ")*" <> ws <> ")\\]") :: MatchResult String in
+    case xs of
+      [] -> s -- eof
+      ["", _, _, _, _] -> before <> "[]" <> fixStrings after -- empty list
+      [cs, _, _, _, _] -> before <> "\"" <> fixChars cs <> "\"" <> fixStrings after
+      _ -> error "Regular expression failure"
+
+fixChars :: String -> String
+fixChars "" = ""
+fixChars s =
+    let MR before _ after [_, c, _] _ = s =~ (ws <> ch <> ws) :: MatchResult String in before <> fixChar c <> fixChars after
+    where
+      fixChar "\\'" = "'"
+      fixChar s' = s'
+
+-- | Names with the best chance of compiling when prettyprinted:
+--    * Remove all package and module names
+--    * Remove suffixes on all constructor names
+--    * Remove suffixes on the four ids we export
+--    * Leave suffixes on all variables and type variables
+safeName :: Name -> Name
+safeName (Name oc (NameG _ns _pn _mn)) = traceShowId $ Name oc NameS
+safeName (Name oc (NameQ _mn)) = traceShowId $ Name oc NameS
+safeName (Name oc@(OccName _) (NameU _)) = traceShowId $ Name oc NameS
+safeName name@(Name _ (NameL _)) = traceShowId $ name -- Not seeing any of these
+safeName name@(Name _ NameS) = traceShowId $ name
+
+-- This will probably make the expression invalid, but it
+-- removes random elements that will make tests fail.
+unsafeName :: Name -> Name
+unsafeName (Name oc (NameG _ns _pn _mn)) = Name oc NameS
+unsafeName (Name oc (NameQ _mn)) = Name oc NameS
+unsafeName (Name oc@(OccName _) (NameU _)) = Name oc NameS
+unsafeName name@(Name _ (NameL _)) = name -- Not seeing any of these
+unsafeName name@(Name _ NameS) = name
+
+ws :: String
+ws = "(\t|\r|\n| |,)*"
+ch :: String
+ch = "'([^'\\\\]|\\\\')'"
