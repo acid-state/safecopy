@@ -17,7 +17,6 @@ import Debug.Trace (traceShowId)
 import Language.Haskell.TH.PprLib (Doc, to_HPJ_Doc)
 import Language.Haskell.TH.Syntax
 import qualified Text.PrettyPrint as HPJ
-import Text.Regex.TDFA ((=~), MatchResult(MR))
 
 -- | Derive an instance of 'SafeCopy'.
 --
@@ -325,24 +324,26 @@ internalDeriveSafeCopyIndexedType deriveType versionId kindName typq tyIndex' = 
     typ -> fail $ "Can't derive SafeCopy instance for: " ++ show typ
   where
 
+renderDecs :: [Dec] -> String
+renderDecs = renderTH (ppr . everywhere (mkT briefName))
+
 worker1 :: DeriveType -> Version a -> Name -> Name -> Type -> Cxt -> [TyVarBndr] -> [(Integer, Con)] -> Q [Dec]
 worker1 deriveType versionId kindName tyName tyBase context tyvars cons =
   let ty = foldl AppT tyBase (fmap (\var -> VarT $ tyVarName var) tyvars)
-      typeNameStr = pprWithoutSuffixes ppr (ConT tyName)
   in (:[]) <$> instanceD (cxt (fmap pure context))
                          (pure (ConT ''SafeCopy `AppT` ty))
                          [ mkPutCopy deriveType cons
-                         , mkGetCopy deriveType typeNameStr cons
+                         , mkGetCopy deriveType (renderTH (ppr . everywhere (mkT cleanName)) (ConT tyName)) cons
                          , valD (varP 'version) (normalB $ litE $ integerL $ fromIntegral $ unVersion versionId) []
                          , valD (varP 'kind) (normalB (varE kindName)) []
-                         , funD 'errorTypeName [clause [wildP] (normalB $ litE $ StringL typeNameStr) []] ]
+                         , funD 'errorTypeName [clause [wildP] (normalB $ litE $ StringL (renderTH (ppr . everywhere (mkT cleanName)) (ConT tyName))) []] ]
 
 worker2 :: DeriveType -> Version a -> Name -> [Name] -> Type -> Type -> Cxt -> [TyVarBndr] -> [(Integer, Con)] -> Q [Dec]
 worker2 _ _ _ _ itype tyBase _ _ _ | itype /= tyBase =
   fail $ "Expected " <> show itype <> ", but found " <> show tyBase
 worker2 deriveType versionId kindName tyIndex' _ tyBase context tyvars cons = do
   let ty = foldl AppT tyBase (fmap (\var -> VarT $ tyVarName var) tyvars)
-      typeNameStr = unwords (pprWithoutSuffixes ppr ty  : map show tyIndex')
+      typeNameStr = unwords (renderTH (ppr . everywhere (mkT cleanName)) ty  : map show tyIndex')
   (:[]) <$> instanceD (cxt (fmap pure context))
                       (pure (ConT ''SafeCopy `AppT` ty))
                       [ mkPutCopy deriveType cons
@@ -391,8 +392,7 @@ mkPutCopy deriveType cons = funD 'putCopy $ map mkPutClause cons
 mkGetCopy :: DeriveType -> String -> [(Integer, Con)] -> DecQ
 mkGetCopy deriveType tyName cons = valD (varP 'getCopy) (normalB $ varE 'contain `appE` mkLabel) []
     where
-      mkLabel = varE 'label `appE` litE (stringL labelString) `appE` getCopyBody
-      labelString = tyName ++ ":"
+      mkLabel = varE 'label `appE` litE (stringL (tyName ++ ":")) `appE` getCopyBody
       getCopyBody
           = case cons of
               [(_, con)] | not (forceTag deriveType) -> mkGetBody con
@@ -488,73 +488,34 @@ typeName _           = "_"
 -- suffixes from its names.  This may make it uncompilable, but it
 -- eliminates a source of randomness in the expected and actual test
 -- case results.
-pprWithoutSuffixes :: Data a => (a -> Doc) -> a -> String
-pprWithoutSuffixes pretty decs =
-  fixNames $
+renderTH :: Data a => (a -> Doc) -> a -> String
+renderTH pretty decs =
+  -- fixNames $
   HPJ.renderStyle (HPJ.style {HPJ.lineLength = 1000000 {-HPJ.mode = HPJ.OneLineMode-}}) $
   to_HPJ_Doc $
   pretty $
-  everywhere (mkT unsafeName) $
   {-fixText-} decs
-
--- | Turn this:
--- @@
---   (Name (mkOccName "AppraisalValue")
---     (NameG TcClsName (mkPkgName "appra_B8Hqp4MOZTzG2RIYHT6sPz")
---        (mkModName "Appraisal.ReportTH")))
--- @@
--- into this:
--- @@
---   $(lift 'Appraisal.ReportTH.AppraisalValue).
--- @@
--- This is applied to all declarations in the generated splice file.
-fixNames :: String -> String
-fixNames s =
-    let s' = fixStrings s in
-    case (s' =~ "\\(Name \\(mkOccName \\\"([^\"]*)\"\\) \\((NameG ([^ ]*) \\(mkPkgName \\\"([^\"]*)\\\"\\) \\(mkModName \\\"([^\"]*)\\\"\\)|NameU [0-9]*)\\)\\)" :: MatchResult String) of
-      MR before _ after [name, _, "", "", ""] _ -> before <> "(mkName " <> show name <> ") " <> fixNames after
-      MR before _ after [name, _, "VarName", _, _modpath] _ -> before <>  "'" <> name <> fixNames after
-      MR before _ after [name, _, "DataName", _, _modpath] _ -> before <>  "''" <> name <> fixNames after
-      MR before _ after [name, _, "TcClsName", _, _modpath] _ -> before <>  "''" <> name <> fixNames after -- I think this is right
-      MR before _ _ _ _ -> before
-
-fixStrings :: String -> String
-fixStrings s =
-    let MR before _ after xs _ = s =~ ("\\[((" <> ws <> ch <> ")*" <> ws <> ")\\]") :: MatchResult String in
-    case xs of
-      [] -> s -- eof
-      ["", _, _, _, _] -> before <> "[]" <> fixStrings after -- empty list
-      [cs, _, _, _, _] -> before <> "\"" <> fixChars cs <> "\"" <> fixStrings after
-      _ -> error "Regular expression failure"
-
-fixChars :: String -> String
-fixChars "" = ""
-fixChars s =
-    let MR before _ after [_, c, _] _ = s =~ (ws <> ch <> ws) :: MatchResult String in before <> fixChar c <> fixChars after
-    where
-      fixChar "\\'" = "'"
-      fixChar s' = s'
 
 -- | Names with the best chance of compiling when prettyprinted:
 --    * Remove all package and module names
 --    * Remove suffixes on all constructor names
 --    * Remove suffixes on the four ids we export
 --    * Leave suffixes on all variables and type variables
-safeName :: Name -> Name
-safeName (Name oc (NameG _ns _pn _mn)) = Name oc NameS
-safeName (Name oc (NameQ _mn)) = Name oc NameS
-safeName (Name oc@(OccName _) (NameU _)) = Name oc NameS
-safeName name@(Name _ (NameL _)) = name -- Not seeing any of these
-safeName name@(Name _ NameS) = name
+cleanName :: Name -> Name
+cleanName (Name oc (NameG _ns _pn mn)) = Name oc (NameQ mn)
+cleanName (Name oc (NameQ mn)) = Name oc (NameQ mn)
+cleanName (Name oc@(OccName _) (NameU _)) = Name oc NameS
+cleanName name@(Name _ (NameL _)) = name -- Not seeing any of these
+cleanName name@(Name _ NameS) = name
 
 -- This will probably make the expression invalid, but it
 -- removes random elements that will make tests fail.
-unsafeName :: Name -> Name
-unsafeName (Name oc (NameG _ns _pn _mn)) = Name oc NameS
-unsafeName (Name oc (NameQ _mn)) = Name oc NameS
-unsafeName (Name oc@(OccName _) (NameU _)) = Name oc NameS
-unsafeName name@(Name _ (NameL _)) = name -- Not seeing any of these
-unsafeName name@(Name _ NameS) = name
+briefName :: Name -> Name
+briefName (Name oc (NameG _ns _pn _mn)) = Name oc NameS
+briefName (Name oc (NameQ _mn)) = Name oc NameS
+briefName (Name oc@(OccName _) (NameU _)) = Name oc NameS
+briefName name@(Name _ (NameL _)) = name -- Not seeing any of these
+briefName name@(Name _ NameS) = name
 
 ws :: String
 ws = "(\t|\r|\n| |,)*"
