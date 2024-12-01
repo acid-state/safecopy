@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, LambdaCase, FlexibleInstances, CPP #-}
+{-# LANGUAGE TemplateHaskell, NoOverloadedStrings, LambdaCase, FlexibleInstances, CPP #-}
 
 module Data.SafeCopy.Derive where
 
@@ -106,10 +106,10 @@ import Text.Regex.TDFA ((=~), MatchResult(MR))
 --   version without any problems.
 deriveSafeCopy :: Version a -> Name -> Name -> Q [Dec]
 deriveSafeCopy versionId kindName tyName =
-  internalDeriveSafeCopy Normal versionId kindName (conT tyName)
+  internalDeriveSafeCopy Normal versionId kindName tyName (conT tyName)
 
 deriveSafeCopy' :: Version a -> Name -> TypeQ -> Q [Dec]
-deriveSafeCopy' versionId kindName typ = internalDeriveSafeCopy Normal versionId kindName typ
+deriveSafeCopy' versionId kindName typ = internalDeriveSafeCopy Normal versionId kindName typ typ
 
 deriveSafeCopyIndexedType :: Version a -> Name -> Name -> [Name] -> Q [Dec]
 deriveSafeCopyIndexedType versionId kindName tyName =
@@ -174,7 +174,7 @@ deriveSafeCopySimple versionId kindName tyName =
 
 deriveSafeCopySimple' :: Version a -> Name -> TypeQ -> Q [Dec]
 deriveSafeCopySimple' versionId kindName typ =
-  internalDeriveSafeCopy Simple versionId kindName typ
+  internalDeriveSafeCopy Simple versionId kindName typ typ
 
 deriveSafeCopySimpleIndexedType :: Version a -> Name -> Name -> [Name] -> Q [Dec]
 deriveSafeCopySimpleIndexedType versionId kindName tyName =
@@ -230,10 +230,11 @@ deriveSafeCopySimpleIndexedType' versionId kindName typ =
 --   without any problems.
 deriveSafeCopyHappstackData :: Version a -> Name -> Name -> Q [Dec]
 deriveSafeCopyHappstackData versionId kindName tyName =
-  deriveSafeCopyHappstackData' versionId kindName (conT tyName)
+  deriveSafeCopyHappstackData' versionId kindName (conT tyName) tyName
 
-deriveSafeCopyHappstackData' :: Version a -> Name -> TypeQ -> Q [Dec]
-deriveSafeCopyHappstackData' = internalDeriveSafeCopy HappstackData
+deriveSafeCopyHappstackData' :: ExtraContext t => Version a -> Name -> TypeQ -> t -> Q [Dec]
+deriveSafeCopyHappstackData' versionId kindName typq t =
+  internalDeriveSafeCopy HappstackData versionId kindName t typq
 
 deriveSafeCopyHappstackDataIndexedType :: Version a -> Name -> Name -> [Name] -> Q [Dec]
 deriveSafeCopyHappstackDataIndexedType versionId kindName tyName =
@@ -263,30 +264,53 @@ class ExtraContext a where
   extraContext :: a -> Q Cxt
 
 -- | Generate SafeCopy constraints for a list of type variables
+instance ExtraContext Cxt where
+  extraContext context = pure context
+
 instance ExtraContext [TyVarBndr] where
   extraContext tyvars =
     pure $ fmap (\var -> AppT (ConT ''SafeCopy) (VarT $ tyVarName var)) tyvars
 
-internalDeriveSafeCopy :: DeriveType -> Version a -> Name -> TypeQ -> Q [Dec]
-internalDeriveSafeCopy deriveType versionId kindName typq = do
+instance ExtraContext Name where
+  extraContext tyName =
+    reify tyName >>= \case
+      TyConI (DataD _ _ tyvars _ _ _) -> extraContext tyvars
+      TyConI (NewtypeD _ _ tyvars _ _ _) -> extraContext tyvars
+      FamilyI _ _ -> pure []
+      info -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info)
+
+instance ExtraContext TypeQ where
+  extraContext typq =
+    typq >>= \case
+      ConT tyName -> extraContext tyName
+      ForallT _ context _ -> pure context
+      typ -> fail $ "Can't derive SafeCopy instance for: " ++ show typ
+
+internalDeriveSafeCopy :: ExtraContext t => DeriveType -> Version a -> Name -> t -> TypeQ -> Q [Dec]
+internalDeriveSafeCopy deriveType versionId kindName t typq = do
   typq >>= \case
-    typ@(ConT tyName) -> do
-      reify tyName >>= \case
-        TyConI (DataD context _name tyvars _kind cons _derivs)
-          | length cons > 255 -> fail $ "Can't derive SafeCopy instance for: " ++ show tyName ++
-                                        ". The datatype must have less than 256 constructors."
-          | otherwise -> do
-              extra <- extraContext tyvars
-              worker1 deriveType versionId kindName tyName typ (context ++ extra) tyvars (zip [0..] cons)
-
-        TyConI (NewtypeD context _name tyvars _kind con _derivs) ->
-          worker1 deriveType versionId kindName tyName typ context tyvars [(0, con)]
-
-        FamilyI _ insts -> do
-          concat <$> (forM insts $ withInst typ (worker1 deriveType versionId kindName tyName))
-        info -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info)
-    -- typ@(Forall tyvars cxt' typ') -> undefined
+    ConT tyName -> doInfo deriveType versionId kindName t tyName =<< reify tyName
+    ForallT _ cxt' typ' -> internalDeriveSafeCopy deriveType versionId kindName cxt' (pure typ')
+    AppT t1 _t2 -> internalDeriveSafeCopy deriveType versionId kindName t (pure t1)
+    TupleT n -> let tyName = tupleTypeName n in doInfo deriveType versionId kindName t tyName =<< reify tyName
     typ -> fail $ "Can't derive SafeCopy instance for: " ++ show typ
+
+doInfo :: ExtraContext t => DeriveType -> Version a -> Name -> t -> Name -> Info -> Q [Dec]
+doInfo deriveType versionId kindName t tyName info =
+  case info of
+    TyConI (DataD context _name tyvars _kind cons _derivs)
+      | length cons > 255 -> fail $ "Can't derive SafeCopy instance for: " ++ show tyName ++
+                                    ". The datatype must have less than 256 constructors."
+      | otherwise -> do
+          extra <- extraContext t
+          worker1 deriveType versionId kindName tyName (ConT tyName) (context ++ extra) tyvars (zip [0..] cons)
+
+    TyConI (NewtypeD context _name tyvars _kind con _derivs) ->
+      worker1 deriveType versionId kindName tyName (ConT tyName) context tyvars [(0, con)]
+
+    FamilyI _ insts -> do
+      concat <$> (forM insts $ withInst (ConT tyName) (worker1 deriveType versionId kindName tyName))
+    _ -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info)
 
 internalDeriveSafeCopyIndexedType :: DeriveType -> Version a -> Name -> TypeQ -> [Name] -> Q [Dec]
 internalDeriveSafeCopyIndexedType deriveType versionId kindName typq tyIndex' = do
@@ -517,11 +541,11 @@ fixChars s =
 --    * Remove suffixes on the four ids we export
 --    * Leave suffixes on all variables and type variables
 safeName :: Name -> Name
-safeName (Name oc (NameG _ns _pn _mn)) = traceShowId $ Name oc NameS
-safeName (Name oc (NameQ _mn)) = traceShowId $ Name oc NameS
-safeName (Name oc@(OccName _) (NameU _)) = traceShowId $ Name oc NameS
-safeName name@(Name _ (NameL _)) = traceShowId $ name -- Not seeing any of these
-safeName name@(Name _ NameS) = traceShowId $ name
+safeName (Name oc (NameG _ns _pn _mn)) = Name oc NameS
+safeName (Name oc (NameQ _mn)) = Name oc NameS
+safeName (Name oc@(OccName _) (NameU _)) = Name oc NameS
+safeName name@(Name _ (NameL _)) = name -- Not seeing any of these
+safeName name@(Name _ NameS) = name
 
 -- This will probably make the expression invalid, but it
 -- removes random elements that will make tests fail.
