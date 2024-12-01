@@ -267,29 +267,16 @@ internalDeriveSafeCopy deriveType versionId kindName typq = do
         TyConI (DataD context _name tyvars _kind cons _derivs)
           | length cons > 255 -> fail $ "Can't derive SafeCopy instance for: " ++ show tyName ++
                                         ". The datatype must have less than 256 constructors."
-          | otherwise         -> worker1 tyName typ context tyvars (zip [0..] cons)
+          | otherwise         -> worker1 deriveType versionId kindName tyName typ context tyvars (zip [0..] cons)
 
         TyConI (NewtypeD context _name tyvars _kind con _derivs) ->
-          worker1 tyName typ context tyvars [(0, con)]
+          worker1 deriveType versionId kindName tyName typ context tyvars [(0, con)]
 
         FamilyI _ insts -> do
-          concat <$> (forM insts $ withInst typ (worker1 tyName))
+          concat <$> (forM insts $ withInst typ (worker1 deriveType versionId kindName tyName))
         info -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info)
+    -- typ@(Forall tyvars cxt' typ') -> undefined
     typ -> fail $ "Can't derive SafeCopy instance for: " ++ show typ
-  where
-    worker1 :: Name -> Type -> Cxt -> [TyVarBndr] -> [(Integer, Con)] -> Q [Dec]
-    worker1 tyName tyBase context tyvars cons =
-      let ty = foldl AppT tyBase [ VarT $ tyVarName var | var <- tyvars ]
-          typeNameStr = pprWithoutSuffixes ppr (ConT tyName)
-          safeCopyClass args = foldl appT (conT ''SafeCopy) args
-      in (:[]) <$> instanceD (cxt $ [safeCopyClass [varT $ tyVarName var] | var <- tyvars] ++ map return context)
-                                       (pure (ConT ''SafeCopy `AppT` ty))
-                                       [ mkPutCopy deriveType cons
-                                       , mkGetCopy deriveType typeNameStr cons
-                                       , valD (varP 'version) (normalB $ litE $ integerL $ fromIntegral $ unVersion versionId) []
-                                       , valD (varP 'kind) (normalB (varE kindName)) []
-                                       , funD 'errorTypeName [clause [wildP] (normalB $ litE $ StringL typeNameStr) []]
-                                       ]
 
 internalDeriveSafeCopyIndexedType :: DeriveType -> Version a -> Name -> TypeQ -> [Name] -> Q [Dec]
 internalDeriveSafeCopyIndexedType deriveType versionId kindName typq tyIndex' = do
@@ -299,25 +286,38 @@ internalDeriveSafeCopyIndexedType deriveType versionId kindName typq tyIndex' = 
       let itype = foldl AppT (ConT tyName) tyIndex
       reify tyName >>= \case
         FamilyI _ insts -> do
-          concat <$> (forM insts $ withInst typ (worker2 tyIndex' itype tyName))
+          concat <$> (forM insts $ withInst typ (worker2 deriveType versionId kindName tyIndex' itype))
         info -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info)
     typ -> fail $ "Can't derive SafeCopy instance for: " ++ show typ
   where
-    worker2 :: [Name] -> Type -> Name -> Type -> Cxt -> [TyVarBndr] -> [(Integer, Con)] -> Q [Dec]
-    worker2 _ itype _ tyBase _ _ _ | itype /= tyBase =
-      fail $ "Expected " <> show itype <> ", but found " <> show tyBase
-    worker2 tyIndex' _ tyName tyBase context tyvars cons = do
-      let ty = foldl AppT tyBase [ VarT $ tyVarName var | var <- tyvars ]
-          typeNameStr tyName = unwords (pprWithoutSuffixes ppr ty  : map show tyIndex')
-          safeCopyClass args = foldl appT (conT ''SafeCopy) args
-      (:[]) <$> instanceD (cxt $ [safeCopyClass [varT $ tyVarName var] | var <- tyvars] ++ map return context)
-                                       (pure (ConT ''SafeCopy `AppT` ty))
-                                       [ mkPutCopy deriveType cons
-                                       , mkGetCopy deriveType (typeNameStr tyName) cons
-                                       , valD (varP 'version) (normalB $ litE $ integerL $ fromIntegral $ unVersion versionId) []
-                                       , valD (varP 'kind) (normalB (varE kindName)) []
-                                       , funD 'errorTypeName [clause [wildP] (normalB $ litE $ StringL (typeNameStr tyName)) []]
-                                       ]
+
+worker1 :: DeriveType -> Version a -> Name -> Name -> Type -> Cxt -> [TyVarBndr] -> [(Integer, Con)] -> Q [Dec]
+worker1 deriveType versionId kindName tyName tyBase context tyvars cons =
+  let ty = foldl AppT tyBase [ VarT $ tyVarName var | var <- tyvars ]
+      typeNameStr = pprWithoutSuffixes ppr (ConT tyName)
+      safeCopyClass args = foldl appT (conT ''SafeCopy) args
+  in (:[]) <$> instanceD (cxt $ [safeCopyClass [varT $ tyVarName var] | var <- tyvars] ++ map return context)
+                         (pure (ConT ''SafeCopy `AppT` ty))
+                         [ mkPutCopy deriveType cons
+                         , mkGetCopy deriveType typeNameStr cons
+                         , valD (varP 'version) (normalB $ litE $ integerL $ fromIntegral $ unVersion versionId) []
+                         , valD (varP 'kind) (normalB (varE kindName)) []
+                         , funD 'errorTypeName [clause [wildP] (normalB $ litE $ StringL typeNameStr) []] ]
+
+worker2 :: DeriveType -> Version a -> Name -> [Name] -> Type -> Type -> Cxt -> [TyVarBndr] -> [(Integer, Con)] -> Q [Dec]
+worker2 _ _ _ _ itype tyBase _ _ _ | itype /= tyBase =
+  fail $ "Expected " <> show itype <> ", but found " <> show tyBase
+worker2 deriveType versionId kindName tyIndex' _ tyBase context tyvars cons = do
+  let ty = foldl AppT tyBase [ VarT $ tyVarName var | var <- tyvars ]
+      typeNameStr = unwords (pprWithoutSuffixes ppr ty  : map show tyIndex')
+      safeCopyClass args = foldl appT (conT ''SafeCopy) args
+  (:[]) <$> instanceD (cxt $ [safeCopyClass [varT $ tyVarName var] | var <- tyvars] ++ map return context)
+                      (pure (ConT ''SafeCopy `AppT` ty))
+                      [ mkPutCopy deriveType cons
+                      , mkGetCopy deriveType typeNameStr cons
+                      , valD (varP 'version) (normalB $ litE $ integerL $ fromIntegral $ unVersion versionId) []
+                      , valD (varP 'kind) (normalB (varE kindName)) []
+                      , funD 'errorTypeName [clause [wildP] (normalB $ litE $ StringL typeNameStr) []] ]
 
 withInst ::
   Monad m
