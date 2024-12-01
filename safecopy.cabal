@@ -1,6 +1,5 @@
 Name:                safecopy
 Version:             0.10.5
-Version:             0.10.4.2
 x-revision:          10
 Synopsis:            Binary serialization with version control.
 Description:         An extension to Data.Serialize with built-in version control.
