@@ -12,12 +12,15 @@ import Control.Lens.Traversal (Traversal')
 import Control.Lens.Action    ((^!!), act)
 import Data.Array (Array)
 import Data.Array.Unboxed (UArray)
+import Data.ByteString (ByteString)
+import Data.Data (Data)
 import Data.Data.Lens         (template)
 import Data.Fixed (Fixed, E1)
 import Data.List
 import Data.SafeCopy
 import Data.SafeCopy.Internal (renderTH, renderDecs)
-import Data.Serialize (runPut, runGet)
+import Data.Serialize (runPut, runGet, Serialize)
+import Data.Set (Set)
 import Data.Time (UniversalTime(..), ZonedTime(..))
 import Data.Tree (Tree)
 import Data.Typeable (Typeable)
@@ -27,6 +30,7 @@ import Language.Haskell.TH.Syntax
 import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck hiding (Fixed, (===))
+import Types
 import qualified Data.Vector as V
 import qualified Data.Vector.Primitive as VP
 import qualified Data.Vector.Storable as VS
@@ -116,8 +120,12 @@ do let a = conT ''Int
 main :: IO ()
 main = defaultMain $ testGroup "SafeCopy instances"
     [ testGroup "decode is the inverse of encode" inversions
-    , testGroup "deriveSafeCopy'"
-      [ testCase "deriveSafeCopy 0 'base ''(,,,,,,,)" $ do
+    , deriveTests ]
+
+
+deriveTests =
+  testGroup "deriveSafeCopy'"
+    [ testCase "deriveSafeCopy 0 'base ''(,,,,,,,)" $ do
           let decs = $(lift =<< deriveSafeCopy 0 'base ''(,,,,,,,))
           renderDecs decs @?= intercalate "\n"
             ["instance (SafeCopy a, SafeCopy b, SafeCopy c, SafeCopy d, SafeCopy e, SafeCopy f, SafeCopy g, SafeCopy h) => SafeCopy ((,,,,,,,) a b c d e f g h)",
@@ -127,7 +135,7 @@ main = defaultMain $ testGroup "SafeCopy instances"
              "          kind = base",
              "          errorTypeName _ = \"GHC.Tuple.(,,,,,,,)\""]
       , testCase "deriveSafeCopy' 0 'base [t(,,,,,,,)|]" $ do
-          let decs = $(lift =<< deriveSafeCopy' 0 'base [t|forall a b c d e f g h. (Show a, Typeable a, SafeCopy a, SafeCopy b, SafeCopy c, SafeCopy d, SafeCopy e, SafeCopy f, SafeCopy g, SafeCopy h) => (a,b,c,d,e,f,g,h)|])
+          let decs = $(lift =<< deriveSafeCopy' 0 'base [t|forall a b c d e f g h. (Show a, Typeable a) => (a,b,c,d,e,f,g,h)|])
           renderDecs decs @?= intercalate "\n"
             ["instance (Show a, Typeable a, SafeCopy a, SafeCopy b, SafeCopy c, SafeCopy d, SafeCopy e, SafeCopy f, SafeCopy g, SafeCopy h) => SafeCopy ((,,,,,,,) a b c d e f g h)",
              "    where putCopy ((,,,,,,,) a1 a2 a3 a4 a5 a6 a7 a8) = contain (do {safePut_a <- getSafePut; safePut_b <- getSafePut; safePut_c <- getSafePut; safePut_d <- getSafePut; safePut_e <- getSafePut; safePut_f <- getSafePut; safePut_g <- getSafePut; safePut_h <- getSafePut; safePut_a a1; safePut_b a2; safePut_c a3; safePut_d a4; safePut_e a5; safePut_f a6; safePut_g a7; safePut_h a8; return ()})",
@@ -135,5 +143,27 @@ main = defaultMain $ testGroup "SafeCopy instances"
              "          version = 0",
              "          kind = base",
              "          errorTypeName _ = \"GHC.Tuple.(,,,,,,,)\""]
-      ]
+      , testCase "deriveSafeCopy' 0 'base (ClientView db)" $ do
+          let decs = $(lift =<< deriveSafeCopy' 0 'base [t|forall db. ClientView db|])
+          renderDecs decs @?= intercalate "\n"
+            ["instance SafeCopy (ViewModifiers db (PKey Client)) => SafeCopy (ClientView db)",
+             "    where putCopy (ClientView a1) = contain (do {safePut_ViewModifiersdbPKeyClient <- getSafePut; safePut_ViewModifiersdbPKeyClient a1; return ()})",
+             "          getCopy = contain (label \"Types.ClientView:\" (do {safeGet_ViewModifiersdbPKeyClient <- getSafeGet; return ClientView <*> safeGet_ViewModifiersdbPKeyClient}))",
+             "          version = 0",
+             "          kind = base",
+             "          errorTypeName _ = \"Types.ClientView\""]
+      , testCase "deriveSafeCopy' 0 'base SearchTerm" $ do
+          let decs = $(lift =<< deriveSafeCopy' 0 'base [t|SearchTerm|])
+          renderDecs decs @?= intercalate "\n"
+            ["instance SafeCopy ([CI Text]) => SafeCopy SearchTerm",
+             "    where putCopy (SearchTerm a1) = contain (do {putWord8 0; safePut_ListaListChar <- getSafePut; safePut_ListaListChar a1; return ()})",
+             "          putCopy (NoTerm) = contain (do {putWord8 1; return ()})",
+             "          getCopy = contain (label \"Types.SearchTerm:\" (do {tag <- getWord8;",
+             "                                                            case tag of",
+             "                                                                0 -> do {safeGet_ListaListChar <- getSafeGet; return SearchTerm <*> safeGet_ListaListChar}",
+             "                                                                1 -> do return NoTerm",
+             "                                                                _ -> fail (\"Could not identify tag \\\"\" ++ (show tag ++ \"\\\" for type \\\"Types.SearchTerm\\\" that has only 2 constructors.  Maybe your data is corrupted?\"))}))",
+             "          version = 0",
+             "          kind = base",
+             "          errorTypeName _ = \"Types.SearchTerm\""]
     ]
