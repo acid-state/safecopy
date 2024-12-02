@@ -277,14 +277,14 @@ instance ExtraContext Name where
       TyConI (DataD _ _ tyvars _ _ _) -> extraContext tyvars
       TyConI (NewtypeD _ _ tyvars _ _ _) -> extraContext tyvars
       FamilyI _ _ -> pure []
-      info -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info)
+      info -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info) ++ " (1)"
 
 instance ExtraContext TypeQ where
   extraContext typq =
     typq >>= \case
       ConT tyName -> extraContext tyName
       ForallT _ context _ -> pure context
-      typ -> fail $ "Can't derive SafeCopy instance for: " ++ show typ
+      typ -> fail $ "Can't derive SafeCopy instance for: " ++ show typ <> " (2)"
 
 instance ExtraContext Con where
   extraContext (NormalC _name types) =
@@ -307,7 +307,7 @@ internalDeriveSafeCopy deriveType versionId kindName t typq = do
     ForallT _ cxt' typ' -> internalDeriveSafeCopy deriveType versionId kindName cxt' (pure typ')
     AppT t1 _t2 -> internalDeriveSafeCopy deriveType versionId kindName t (pure t1)
     TupleT n -> let tyName = tupleTypeName n in doInfo deriveType versionId kindName t tyName =<< reify tyName
-    typ -> fail $ "Can't derive SafeCopy instance for: " ++ show typ
+    typ -> fail $ "Can't derive SafeCopy instance for: " ++ show typ ++ " (3)"
 
 doInfo :: ExtraContext t => DeriveType -> Version a -> Name -> t -> Name -> Info -> Q [Dec]
 doInfo deriveType versionId kindName t tyName info =
@@ -324,7 +324,7 @@ doInfo deriveType versionId kindName t tyName info =
 
     FamilyI _ insts -> do
       concat <$> (forM insts $ withInst (ConT tyName) (doCons deriveType versionId kindName tyName))
-    _ -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info)
+    _ -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info) ++ " (4)"
 
 internalDeriveSafeCopyIndexedType :: DeriveType -> Version a -> Name -> TypeQ -> [Name] -> Q [Dec]
 internalDeriveSafeCopyIndexedType deriveType versionId kindName typq tyIndex' = do
@@ -335,8 +335,8 @@ internalDeriveSafeCopyIndexedType deriveType versionId kindName typq tyIndex' = 
       reify tyName >>= \case
         FamilyI _ insts -> do
           concat <$> (forM insts $ withInst typ (worker2 deriveType versionId kindName tyIndex' itype))
-        info -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info)
-    typ -> fail $ "Can't derive SafeCopy instance for: " ++ show typ
+        info -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info) ++ " (5)"
+    typ -> fail $ "Can't derive SafeCopy instance for: " ++ show typ ++ " (6)"
   where
 
 renderDecs :: [Dec] -> String
@@ -356,7 +356,7 @@ doCons deriveType versionId kindName tyName tyBase context tyvars cons = do
 
 worker2 :: DeriveType -> Version a -> Name -> [Name] -> Type -> Type -> Cxt -> [TyVarBndr] -> [(Integer, Con)] -> Q [Dec]
 worker2 _ _ _ _ itype tyBase _ _ _ | itype /= tyBase =
-  fail $ "Expected " <> show itype <> ", but found " <> show tyBase
+  fail $ "Expected " <> show itype <> ", but found " <> show tyBase ++ " (7)"
 worker2 deriveType versionId kindName tyIndex' _ tyBase context tyvars cons = do
   let ty = foldl AppT tyBase (fmap (\var -> VarT $ tyVarName var) tyvars)
       typeNameStr = unwords (renderTH (ppr . everywhere (mkT cleanName)) ty  : map show tyIndex')
