@@ -14,7 +14,7 @@ import Data.Maybe (fromMaybe)
 #ifdef __HADDOCK__
 import Data.Word (Word8) -- Haddock
 #endif
-import Debug.Trace
+-- import Debug.Trace
 import Language.Haskell.TH.PprLib (Doc, to_HPJ_Doc)
 import Language.Haskell.TH.Syntax
 import qualified Text.PrettyPrint as HPJ
@@ -263,9 +263,6 @@ tyVarName (KindedTV n _) = n
 class ExtraContext a where
   extraContext :: a -> Q Cxt
 
-instance (ExtraContext a, ExtraContext b) => ExtraContext (a, b) where
-  extraContext (a, b) = (<>) <$> extraContext a <*> extraContext b
-
 -- | Generate SafeCopy constraints for a list of type variables
 instance ExtraContext Cxt where
   extraContext context = pure context
@@ -290,14 +287,15 @@ instance ExtraContext TypeQ where
       typ -> fail $ "Can't derive SafeCopy instance for: " ++ show typ
 
 instance ExtraContext Con where
-  extraContext (NormalC name types) =
+  extraContext (NormalC _name types) =
     fmap mconcat (sequence <$> mapM extraContext (fmap snd types))
-  extraContext (RecC name types) =
+  extraContext (RecC _name types) =
     fmap mconcat (sequence <$> mapM extraContext (fmap (\(_, _, typ) -> typ) types))
-  extraContext (InfixC type1 name type2) = extraContext (snd type1, snd type2)
-  extraContext (ForallC tyvars context con) = (<>) <$> pure context <*> extraContext con
-  extraContext (GadtC names types typ) = pure []
-  extraContext (RecGadtC names types typ) = pure []
+  extraContext (InfixC type1 _name type2) =
+    fmap mconcat (sequence <$> mapM extraContext [snd type1, snd type2])
+  extraContext (ForallC _tyvars context con) = (<>) <$> pure context <*> extraContext con
+  extraContext (GadtC _names _types _typ) = pure []
+  extraContext (RecGadtC _names _types _typ) = pure []
 
 instance ExtraContext Type where
   extraContext typ = sequence [ [t|SafeCopy $(pure typ)|] ]
