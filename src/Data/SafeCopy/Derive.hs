@@ -117,17 +117,11 @@ deriveSafeCopy versionId kindName tyName = do
   extra <- extraContext tyName
   fst <$> evalRWST (internalDeriveSafeCopy (conT tyName)) (R Normal versionId kindName) (S extra)
 
+-- | Generalized version of 'deriveSafeCopy', takes a 'Type' rather
+-- than a type 'Name'.
 deriveSafeCopy' :: Version a -> Name -> TypeQ -> Q [Dec]
 deriveSafeCopy' versionId kindName typ = do
   fst <$> evalRWST (internalDeriveSafeCopy typ) (R Normal versionId kindName) (S mempty)
-
-deriveSafeCopyIndexedType :: Version a -> Name -> Name -> [Name] -> Q [Dec]
-deriveSafeCopyIndexedType versionId kindName tyName =
-  internalDeriveSafeCopyIndexedType Normal versionId kindName (conT tyName)
-
-deriveSafeCopyIndexedType' :: Version a -> Name -> TypeQ -> [Name] -> Q [Dec]
-deriveSafeCopyIndexedType' versionId kindName typ =
-  internalDeriveSafeCopyIndexedType Normal versionId kindName typ
 
 -- | Derive an instance of 'SafeCopy'.  The instance derived by
 --   this function is simpler than the one derived by
@@ -187,14 +181,6 @@ deriveSafeCopySimple' versionId kindName typ = do
   extra <- extraContext typ
   fst <$> evalRWST (internalDeriveSafeCopy typ) (R Simple versionId kindName) (S extra)
 
-deriveSafeCopySimpleIndexedType :: Version a -> Name -> Name -> [Name] -> Q [Dec]
-deriveSafeCopySimpleIndexedType versionId kindName tyName =
-  deriveSafeCopySimpleIndexedType' versionId kindName (conT tyName)
-
-deriveSafeCopySimpleIndexedType' :: Version a -> Name -> TypeQ -> [Name] -> Q [Dec]
-deriveSafeCopySimpleIndexedType' versionId kindName typ =
-  internalDeriveSafeCopyIndexedType Simple versionId kindName typ
-
 -- | Derive an instance of 'SafeCopy'.  The instance derived by
 --   this function should be compatible with the instance derived
 --   by the module @Happstack.Data.SerializeTH@ of the
@@ -247,15 +233,7 @@ deriveSafeCopyHappstackData' :: ExtraContext t => Version a -> Name -> TypeQ -> 
 deriveSafeCopyHappstackData' versionId kindName typq t = do
   extra <- extraContext t
   fst <$> evalRWST (internalDeriveSafeCopy typq) (R HappstackData versionId kindName) (S extra)
-
-deriveSafeCopyHappstackDataIndexedType :: Version a -> Name -> Name -> [Name] -> Q [Dec]
-deriveSafeCopyHappstackDataIndexedType versionId kindName tyName =
-  deriveSafeCopyHappstackDataIndexedType' versionId kindName (conT tyName)
-
-deriveSafeCopyHappstackDataIndexedType' :: Version a -> Name -> TypeQ -> [Name] -> Q [Dec]
-deriveSafeCopyHappstackDataIndexedType' versionId kindName typ =
-  internalDeriveSafeCopyIndexedType HappstackData versionId kindName typ
-
+
 data DeriveType = Normal | Simple | HappstackData
 
 forceTag :: DeriveType -> Bool
@@ -597,3 +575,27 @@ ws :: String
 ws = "(\t|\r|\n| |,)*"
 ch :: String
 ch = "'([^'\\\\]|\\\\')'"
+
+deriveSafeCopyIndexedType :: Version a -> Name -> Name -> [Name] -> Q [Dec]
+deriveSafeCopyIndexedType versionId kindName tyName =
+  internalDeriveSafeCopyIndexedType Normal versionId kindName (conT tyName)
+
+deriveSafeCopyIndexedType' :: Version a -> Name -> TypeQ -> [Name] -> Q [Dec]
+deriveSafeCopyIndexedType' versionId kindName typ =
+  internalDeriveSafeCopyIndexedType Normal versionId kindName typ
+
+deriveSafeCopySimpleIndexedType :: Version a -> Name -> Name -> [Name] -> Q [Dec]
+deriveSafeCopySimpleIndexedType versionId kindName tyName =
+  deriveSafeCopySimpleIndexedType' versionId kindName (conT tyName)
+
+deriveSafeCopySimpleIndexedType' :: Version a -> Name -> TypeQ -> [Name] -> Q [Dec]
+deriveSafeCopySimpleIndexedType' versionId kindName typ =
+  internalDeriveSafeCopyIndexedType Simple versionId kindName typ
+
+deriveSafeCopyHappstackDataIndexedType :: Version a -> Name -> Name -> [Name] -> Q [Dec]
+deriveSafeCopyHappstackDataIndexedType versionId kindName tyName =
+  deriveSafeCopyHappstackDataIndexedType' versionId kindName (conT tyName)
+
+deriveSafeCopyHappstackDataIndexedType' :: Version a -> Name -> TypeQ -> [Name] -> Q [Dec]
+deriveSafeCopyHappstackDataIndexedType' versionId kindName typ =
+  internalDeriveSafeCopyIndexedType HappstackData versionId kindName typ
