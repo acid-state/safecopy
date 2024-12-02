@@ -1,4 +1,10 @@
-{-# LANGUAGE TemplateHaskell, NoOverloadedStrings, LambdaCase, FlexibleInstances, CPP #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NoOverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Data.SafeCopy.Derive where
 
@@ -7,6 +13,7 @@ import Data.SafeCopy.SafeCopy
 
 import Language.Haskell.TH hiding (Kind)
 import Control.Monad
+import Control.Monad.RWS as MTL (ask, evalRWST, get, lift, modify, RWST)
 import Data.Data (Data)
 import Data.Generics (everywhere, mkT)
 import Data.List (nub)
@@ -15,6 +22,7 @@ import Data.Maybe (fromMaybe)
 import Data.Word (Word8) -- Haddock
 #endif
 -- import Debug.Trace
+import GHC.Generics (Generic)
 import Language.Haskell.TH.PprLib (Doc, to_HPJ_Doc)
 import Language.Haskell.TH.Syntax
 import qualified Text.PrettyPrint as HPJ
@@ -105,11 +113,13 @@ import qualified Text.PrettyPrint as HPJ
 --   version of your data type and 'deriveSafeCopy' in another
 --   version without any problems.
 deriveSafeCopy :: Version a -> Name -> Name -> Q [Dec]
-deriveSafeCopy versionId kindName tyName =
-  internalDeriveSafeCopy Normal versionId kindName tyName (conT tyName)
+deriveSafeCopy versionId kindName tyName = do
+  extra <- extraContext tyName
+  fst <$> evalRWST (internalDeriveSafeCopy (conT tyName)) (R Normal versionId kindName) (S extra)
 
 deriveSafeCopy' :: Version a -> Name -> TypeQ -> Q [Dec]
-deriveSafeCopy' versionId kindName typ = internalDeriveSafeCopy Normal versionId kindName typ typ
+deriveSafeCopy' versionId kindName typ = do
+  fst <$> evalRWST (internalDeriveSafeCopy typ) (R Normal versionId kindName) (S mempty)
 
 deriveSafeCopyIndexedType :: Version a -> Name -> Name -> [Name] -> Q [Dec]
 deriveSafeCopyIndexedType versionId kindName tyName =
@@ -173,8 +183,9 @@ deriveSafeCopySimple versionId kindName tyName =
   deriveSafeCopySimple' versionId kindName (conT tyName)
 
 deriveSafeCopySimple' :: Version a -> Name -> TypeQ -> Q [Dec]
-deriveSafeCopySimple' versionId kindName typ =
-  internalDeriveSafeCopy Simple versionId kindName typ typ
+deriveSafeCopySimple' versionId kindName typ = do
+  extra <- extraContext typ
+  fst <$> evalRWST (internalDeriveSafeCopy typ) (R Simple versionId kindName) (S extra)
 
 deriveSafeCopySimpleIndexedType :: Version a -> Name -> Name -> [Name] -> Q [Dec]
 deriveSafeCopySimpleIndexedType versionId kindName tyName =
@@ -233,8 +244,9 @@ deriveSafeCopyHappstackData versionId kindName tyName =
   deriveSafeCopyHappstackData' versionId kindName (conT tyName) tyName
 
 deriveSafeCopyHappstackData' :: ExtraContext t => Version a -> Name -> TypeQ -> t -> Q [Dec]
-deriveSafeCopyHappstackData' versionId kindName typq t =
-  internalDeriveSafeCopy HappstackData versionId kindName t typq
+deriveSafeCopyHappstackData' versionId kindName typq t = do
+  extra <- extraContext t
+  fst <$> evalRWST (internalDeriveSafeCopy typq) (R HappstackData versionId kindName) (S extra)
 
 deriveSafeCopyHappstackDataIndexedType :: Version a -> Name -> Name -> [Name] -> Q [Dec]
 deriveSafeCopyHappstackDataIndexedType versionId kindName tyName =
@@ -260,8 +272,16 @@ tyVarName (PlainTV n) = n
 tyVarName (KindedTV n _) = n
 #endif
 
-class ExtraContext a where
-  extraContext :: a -> Q Cxt
+data R a =
+  R { _deriveType :: DeriveType
+    , _versionId :: Version a
+    , _kindName :: Name }
+
+type W = ()
+data S = S { _extraContext :: Cxt } deriving Generic
+
+class ExtraContext t where
+  extraContext :: t -> Q Cxt
 
 -- | Generate SafeCopy constraints for a list of type variables
 instance ExtraContext Cxt where
@@ -311,30 +331,33 @@ instance ExtraContext Con where
   extraContext (GadtC _names _types _typ) = pure []
   extraContext (RecGadtC _names _types _typ) = pure []
 
-internalDeriveSafeCopy :: ExtraContext t => DeriveType -> Version a -> Name -> t -> TypeQ -> Q [Dec]
-internalDeriveSafeCopy deriveType versionId kindName t typq = do
-  typq >>= \case
-    ConT tyName -> doInfo deriveType versionId kindName t tyName =<< reify tyName
-    ForallT _ cxt' typ' -> internalDeriveSafeCopy deriveType versionId kindName cxt' (pure typ')
-    AppT t1 _t2 -> internalDeriveSafeCopy deriveType versionId kindName t (pure t1)
-    TupleT n -> let tyName = tupleTypeName n in doInfo deriveType versionId kindName t tyName =<< reify tyName
+internalDeriveSafeCopy :: TypeQ -> RWST (R a) W S Q [Dec]
+internalDeriveSafeCopy typq = do
+  MTL.lift typq >>= \case
+    ConT tyName -> doInfo tyName =<< MTL.lift (reify tyName)
+    ForallT _ cxt' typ' -> do
+      modify (\(S context) -> S (context <> cxt'))
+      internalDeriveSafeCopy (pure typ')
+    AppT t1 _t2 -> internalDeriveSafeCopy (pure t1)
+    TupleT n -> let tyName = tupleTypeName n in doInfo tyName =<< MTL.lift (reify tyName)
     typ -> fail $ "Can't derive SafeCopy instance for: " ++ show typ ++ " (3)"
 
-doInfo :: ExtraContext t => DeriveType -> Version a -> Name -> t -> Name -> Info -> Q [Dec]
-doInfo deriveType versionId kindName t tyName info =
+doInfo :: Name -> Info -> RWST (R a) W S Q [Dec]
+doInfo tyName info =
   case info of
     TyConI (DataD context _name tyvars _kind cons _derivs)
       | length cons > 255 -> fail $ "Can't derive SafeCopy instance for: " ++ show tyName ++
                                     ". The datatype must have less than 256 constructors."
       | otherwise -> do
-          extra <- extraContext t
-          doCons deriveType versionId kindName tyName (ConT tyName) (context ++ extra) tyvars (zip [0..] cons)
+          modify (\(S context') -> S (context' ++ context))
+          doCons tyName (ConT tyName) tyvars (zip [0..] cons)
 
-    TyConI (NewtypeD context _name tyvars _kind con _derivs) ->
-      doCons deriveType versionId kindName tyName (ConT tyName) context tyvars (zip [0..] [con])
+    TyConI (NewtypeD context _name tyvars _kind con _derivs) -> do
+      modify (\(S context') -> S (context' <> context))
+      doCons tyName (ConT tyName) tyvars (zip [0..] [con])
 
     FamilyI _ insts -> do
-      concat <$> (forM insts $ withInst (ConT tyName) (doCons deriveType versionId kindName tyName))
+      concat <$> (forM insts $ withInst (ConT tyName) (doCons tyName))
     _ -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info) ++ " (4)"
 
 internalDeriveSafeCopyIndexedType :: DeriveType -> Version a -> Name -> TypeQ -> [Name] -> Q [Dec]
@@ -345,7 +368,7 @@ internalDeriveSafeCopyIndexedType deriveType versionId kindName typq tyIndex' = 
       let itype = foldl AppT (ConT tyName) tyIndex
       reify tyName >>= \case
         FamilyI _ insts -> do
-          concat <$> (forM insts $ withInst typ (worker2 deriveType versionId kindName tyIndex' itype))
+          concat <$> (forM insts $ withInst2 typ (worker2 deriveType versionId kindName tyIndex' itype))
         info -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info) ++ " (5)"
     typ -> fail $ "Can't derive SafeCopy instance for: " ++ show typ ++ " (6)"
   where
@@ -353,17 +376,19 @@ internalDeriveSafeCopyIndexedType deriveType versionId kindName typq tyIndex' = 
 renderDecs :: [Dec] -> String
 renderDecs = renderTH (ppr . everywhere (mkT briefName))
 
-doCons :: DeriveType -> Version a -> Name -> Name -> Type -> Cxt -> [TyVarBndr] -> [(Integer, Con)] -> Q [Dec]
-doCons deriveType versionId kindName tyName tyBase context tyvars cons = do
+doCons :: Name -> Type -> [TyVarBndr] -> [(Integer, Con)] -> RWST (R a) W S Q [Dec]
+doCons tyName tyBase tyvars cons = do
   let ty = foldl AppT tyBase (fmap (\var -> VarT $ tyVarName var) tyvars)
-  extra <- concat <$> mapM extraContext (fmap snd cons)
-  (:[]) <$> instanceD (cxt (fmap pure (nub (context <> extra))))
+  extra <- concat <$> mapM (MTL.lift . extraContext) (fmap snd cons)
+  S context <- get
+  r <- ask
+  (:[]) <$> MTL.lift (instanceD (cxt (fmap pure (nub (context <> extra))))
                       (pure (ConT ''SafeCopy `AppT` ty))
-                      [ mkPutCopy deriveType cons
-                      , mkGetCopy deriveType (renderTH (ppr . everywhere (mkT cleanName)) (ConT tyName)) cons
-                      , valD (varP 'version) (normalB $ litE $ integerL $ fromIntegral $ unVersion versionId) []
-                      , valD (varP 'kind) (normalB (varE kindName)) []
-                      , funD 'errorTypeName [clause [wildP] (normalB $ litE $ StringL (renderTH (ppr . everywhere (mkT cleanName)) (ConT tyName))) []] ]
+                      [ mkPutCopy (_deriveType r) cons
+                      , mkGetCopy (_deriveType r) (renderTH (ppr . everywhere (mkT cleanName)) (ConT tyName)) cons
+                      , valD (varP 'version) (normalB $ litE $ integerL $ fromIntegral $ unVersion (_versionId r)) []
+                      , valD (varP 'kind) (normalB (varE (_kindName r))) []
+                      , funD 'errorTypeName [clause [wildP] (normalB $ litE $ StringL (renderTH (ppr . everywhere (mkT cleanName)) (ConT tyName))) []] ])
 
 worker2 :: DeriveType -> Version a -> Name -> [Name] -> Type -> Type -> Cxt -> [TyVarBndr] -> [(Integer, Con)] -> Q [Dec]
 worker2 _ _ _ _ itype tyBase _ _ _ | itype /= tyBase =
@@ -380,23 +405,47 @@ worker2 deriveType versionId kindName tyIndex' _ tyBase context tyvars cons = do
                       , funD 'errorTypeName [clause [wildP] (normalB $ litE $ StringL typeNameStr) []] ]
 
 withInst ::
+  (m ~ RWST (R a) W S Q, Monad m)
+  => Type
+  -> (Type -> [TyVarBndr] -> [(Integer, Con)] -> m r)
+  -> Dec
+  -> m r
+#if MIN_VERSION_template_haskell(2,15,0)
+withInst typ worker (DataInstD context _ nty _ cons _) = do
+  modify (\(S context') -> S (context' <> context))
+  worker nty [] (zip [0..] cons)
+withInst typ worker (NewtypeInstD context _ ty _ con _) = do
+  modify (\(S context') -> S (context' <> context))
+  worker nty [] (zip [0..] [con])
+#else
+withInst typ worker (DataInstD context _ ty _ cons _) = do
+  modify (\(S context') -> S (context' <> context))
+  worker (foldl AppT typ ty) [] (zip [0..] cons)
+withInst typ worker (NewtypeInstD context _ ty _ con _) = do
+  modify (\(S context') -> S (context' <> context))
+  worker (foldl AppT typ ty) [] (zip [0..] [con])
+#endif
+withInst typ _ _ =
+  fail $ "Can't derive SafeCopy instance for: " ++ show typ
+
+withInst2 ::
   Monad m
   => Type
   -> (Type -> Cxt -> [TyVarBndr] -> [(Integer, Con)] -> m r)
   -> Dec
   -> m r
 #if MIN_VERSION_template_haskell(2,15,0)
-withInst typ worker (DataInstD context _ nty _ cons _) =
+withInst2 typ worker (DataInstD context _ nty _ cons _) =
   worker nty context [] (zip [0..] cons)
-withInst typ worker (NewtypeInstD context _ ty _ con _) =
+withInst2 typ worker (NewtypeInstD context _ ty _ con _) =
   worker nty context [] (zip [0..] [con])
 #else
-withInst typ worker (DataInstD context _ ty _ cons _) =
+withInst2 typ worker (DataInstD context _ ty _ cons _) =
   worker (foldl AppT typ ty) context [] (zip [0..] cons)
-withInst typ worker (NewtypeInstD context _ ty _ con _) =
+withInst2 typ worker (NewtypeInstD context _ ty _ con _) =
   worker (foldl AppT typ ty) context [] (zip [0..] [con])
 #endif
-withInst typ _ _ =
+withInst2 typ _ _ =
   fail $ "Can't derive SafeCopy instance for: " ++ show typ
 
 mkPutCopy :: DeriveType -> [(Integer, Con)] -> DecQ
