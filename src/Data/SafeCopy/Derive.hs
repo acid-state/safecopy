@@ -276,15 +276,29 @@ instance ExtraContext Name where
     reify tyName >>= \case
       TyConI (DataD _ _ tyvars _ _ _) -> extraContext tyvars
       TyConI (NewtypeD _ _ tyvars _ _ _) -> extraContext tyvars
+      TyConI (TySynD _name _tyvars typ) -> extraContext typ
       FamilyI _ _ -> pure []
       info -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info) ++ " (1)"
 
 instance ExtraContext TypeQ where
   extraContext typq =
-    typq >>= \case
+    extraContext =<< typq
+
+instance ExtraContext Type where
+  extraContext typ =
+    case typ of
       ConT tyName -> extraContext tyName
+      VarT tyName -> (:[]) <$> [t|SafeCopy $(varT tyName)|]
       ForallT _ context _ -> pure context
-      typ -> fail $ "Can't derive SafeCopy instance for: " ++ show typ <> " (2)"
+      AppT typ' param -> extraContext (typ', [param])
+      _ -> fail $ "Can't derive SafeCopy instance for: " ++ show typ <> " (2)"
+
+-- | Unfolded type application
+instance ExtraContext (Type, [Type]) where
+  extraContext (AppT typ param, params) = extraContext (typ, (param : params))
+  extraContext (ListT, [param]) = extraContext param
+  extraContext (ConT tyName, _params) = extraContext tyName
+  extraContext (typ, _params) = fail $ "Can't derive SafeCopy instance for: " ++ show typ <> " (8)"
 
 instance ExtraContext Con where
   extraContext (NormalC _name types) =
@@ -296,9 +310,6 @@ instance ExtraContext Con where
   extraContext (ForallC _tyvars context con) = (<>) <$> pure context <*> extraContext con
   extraContext (GadtC _names _types _typ) = pure []
   extraContext (RecGadtC _names _types _typ) = pure []
-
-instance ExtraContext Type where
-  extraContext typ = sequence [ [t|SafeCopy $(pure typ)|] ]
 
 internalDeriveSafeCopy :: ExtraContext t => DeriveType -> Version a -> Name -> t -> TypeQ -> Q [Dec]
 internalDeriveSafeCopy deriveType versionId kindName t typq = do
