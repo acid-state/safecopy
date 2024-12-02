@@ -70,15 +70,17 @@ Test-suite instances
   Main-is:             instances.hs
   Hs-Source-Dirs:      test/
   GHC-Options:         -Wall -threaded -rtsopts -with-rtsopts=-N
-  Build-depends:       base, cereal, template-haskell, safecopy,
+  Build-depends:       base, bytestring, cereal, template-haskell, safecopy,
                        containers, time, array, vector, lens >= 4.7 && < 6,
                        lens-action
+                     , syb
                      , tasty
                      , tasty-hunit
                      , tasty-quickcheck
                      , quickcheck-instances
                      , QuickCheck >= 2.8.2 && < 3
                      , th-orphans
+  Other-Modules:       Types
 
 Test-suite generic
   Default-language:    Haskell2010
