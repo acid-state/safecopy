@@ -48,6 +48,7 @@ Library
                        generic-data >= 0.3.0.0,
                        containers >= 0.3 && < 0.8,
                        old-time < 1.2,
+                       mtl,
                        pretty,
                        syb,
                        template-haskell >= 2.11.0.0 && < 2.23,
