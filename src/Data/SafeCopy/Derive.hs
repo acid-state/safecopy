@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NoOverloadedStrings #-}
+{-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -30,17 +31,16 @@ import Control.Monad
 import Control.Monad.RWS as MTL (ask, execRWST, lift, local, RWST, tell)
 -- import Data.Data (Data)
 import Data.Generics (Data, everywhere, mkT)
-import Data.List (intercalate, nub)
+import Data.List ({-intercalate,-} nub)
 import Data.Maybe (fromMaybe)
 #ifdef __HADDOCK__
 import Data.Word (Word8) -- Haddock
 #endif
-import Debug.Trace
+-- import Debug.Trace
 import GHC.Generics (Generic)
 import GHC.Stack (HasCallStack)
 import Language.Haskell.TH.PprLib (Doc, to_HPJ_Doc)
 import Language.Haskell.TH.Syntax
-import SeeReason.SrcLoc
 import qualified Text.PrettyPrint as HPJ
 
 -- | Derive an instance of 'SafeCopy'.
@@ -288,7 +288,7 @@ doType typ = -- traceLocM ("doType " <> ren typ) $
       local (over #_freeVars (fmap unKind tyvars <>)) $ doType typ'
     AppT t1 t2 -> local (over #_params (t2 :)) $ doType t1
     TupleT n -> doTypeName (tupleTypeName n)
-    _ -> fail $ "Can't derive SafeCopy instance for: " ++ show typ ++ " (" <> compactStack getStack <> ")"
+    _ -> fail $ "Can't derive SafeCopy instance for: " ++ show typ -- ++ " (" <> compactStack getStack <> ")"
 
 doTypeName :: Name -> RWST (R a) W S Q ()
 doTypeName tyName = -- traceLocM ("doTypeName " <> ren tyName) $
@@ -313,7 +313,7 @@ doInfo tyName info = -- traceLocM ("doInfo " <> ren tyName <> " (" <> ren info <
 
     FamilyI _ insts -> do
       mapM_ (doInst tyName info . instCompat) insts
-    _ -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info) ++ " (" <> compactStack getStack <> ")"
+    _ -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info) -- ++ " (" <> compactStack getStack <> ")"
 
 withBindings :: [TyVarBndr] -> RWST (R a) W S Q () -> RWST (R a) W S Q ()
 withBindings tyvars action = do
@@ -569,6 +569,7 @@ typeName _           = "_"
 
 -- * Debugging
 
+#if 0
 traceLoc :: HasCallStack => String -> a -> a
 traceLoc s a =
   trace (s <> " (" <> compactStack (drop 1 getStack) <> ")") a
@@ -578,11 +579,12 @@ traceLocM s t = do
   indent <- view #_indent
   params <- view #_params
   bindings <- use #_bindings
-  local (\r@R{..} -> r {_indent = "  " <> _indent}) $
+  local (over #_indent ("  " <>)) $
     trace (indent <> s <> "\n" <>
            indent <> "  --> params: [" <> intercalate ", " (fmap vis params) <> "]\n" <>
            indent <> "  --> bindings: [" <> intercalate ", " (fmap (\(tv, ty) -> "(tv=" <> vis tv <> ", ty=" <> vis ty <> ")") bindings) <> "]\n" <>
            indent <> "  --> stack: " <> compactStack (drop 1 getStack)) t
+#endif
 
 ren :: (Data a, Ppr a) => a -> String
 ren = renderTH (ppr . everywhere (mkT briefName))
