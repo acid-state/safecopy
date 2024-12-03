@@ -6,25 +6,42 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module Data.SafeCopy.Derive where
+module Data.SafeCopy.Derive
+  ( deriveSafeCopy
+  , deriveSafeCopy'
+  , deriveSafeCopySimple
+  , deriveSafeCopySimple'
+  , deriveSafeCopyHappstackData
+  , deriveSafeCopyHappstackData'
+  , deriveSafeCopyIndexedType
+  , deriveSafeCopyIndexedType'
+  , deriveSafeCopySimpleIndexedType
+  , deriveSafeCopySimpleIndexedType'
+  , deriveSafeCopyHappstackDataIndexedType
+  , deriveSafeCopyHappstackDataIndexedType'
+  ) where
 
+import Data.Generics.Labels ()
 import Data.Serialize (getWord8, putWord8, label)
-import Data.SafeCopy.SafeCopy hiding (Kind)
+import Data.SafeCopy.Internal (Version(unVersion), SafeCopy(version, kind, errorTypeName, getCopy, putCopy), contain, getSafePut, getSafeGet, safeGet, safePut,)
 
 import Language.Haskell.TH hiding (Kind)
+import Control.Lens ((%=), _3, over, set, use, view)
 import Control.Monad
-import Control.Monad.RWS as MTL (ask, evalRWST, get, lift, modify, RWST)
-import Data.Data (Data)
-import Data.Generics (everywhere, mkT)
-import Data.List (nub)
+import Control.Monad.RWS as MTL (ask, execRWST, lift, local, RWST, tell)
+-- import Data.Data (Data)
+import Data.Generics (Data, everywhere, mkT)
+import Data.List (intercalate, nub)
 import Data.Maybe (fromMaybe)
 #ifdef __HADDOCK__
 import Data.Word (Word8) -- Haddock
 #endif
--- import Debug.Trace
+import Debug.Trace
 import GHC.Generics (Generic)
+import GHC.Stack (HasCallStack)
 import Language.Haskell.TH.PprLib (Doc, to_HPJ_Doc)
 import Language.Haskell.TH.Syntax
+import SeeReason.SrcLoc
 import qualified Text.PrettyPrint as HPJ
 
 -- | Derive an instance of 'SafeCopy'.
@@ -114,14 +131,13 @@ import qualified Text.PrettyPrint as HPJ
 --   version without any problems.
 deriveSafeCopy :: Version a -> Name -> Name -> Q [Dec]
 deriveSafeCopy versionId kindName tyName = do
-  extra <- extraContext tyName
-  fst <$> evalRWST (internalDeriveSafeCopy (conT tyName)) (R Normal versionId kindName) (S extra)
+  deriveSafeCopy' versionId kindName (conT tyName)
 
 -- | Generalized version of 'deriveSafeCopy', takes a 'Type' rather
 -- than a type 'Name'.
 deriveSafeCopy' :: Version a -> Name -> TypeQ -> Q [Dec]
 deriveSafeCopy' versionId kindName typ = do
-  fst <$> evalRWST (internalDeriveSafeCopy typ) (R Normal versionId kindName) (S mempty)
+  internalDeriveSafeCopy Normal versionId kindName typ
 
 -- | Derive an instance of 'SafeCopy'.  The instance derived by
 --   this function is simpler than the one derived by
@@ -178,8 +194,7 @@ deriveSafeCopySimple versionId kindName tyName =
 
 deriveSafeCopySimple' :: Version a -> Name -> TypeQ -> Q [Dec]
 deriveSafeCopySimple' versionId kindName typ = do
-  extra <- extraContext typ
-  fst <$> evalRWST (internalDeriveSafeCopy typ) (R Simple versionId kindName) (S extra)
+  internalDeriveSafeCopy Simple versionId kindName typ
 
 -- | Derive an instance of 'SafeCopy'.  The instance derived by
 --   this function should be compatible with the instance derived
@@ -227,132 +242,166 @@ deriveSafeCopySimple' versionId kindName typ = do
 --   without any problems.
 deriveSafeCopyHappstackData :: Version a -> Name -> Name -> Q [Dec]
 deriveSafeCopyHappstackData versionId kindName tyName =
-  deriveSafeCopyHappstackData' versionId kindName (conT tyName) tyName
+  deriveSafeCopyHappstackData' versionId kindName (conT tyName)
 
-deriveSafeCopyHappstackData' :: ExtraContext t => Version a -> Name -> TypeQ -> t -> Q [Dec]
-deriveSafeCopyHappstackData' versionId kindName typq t = do
-  extra <- extraContext t
-  fst <$> evalRWST (internalDeriveSafeCopy typq) (R HappstackData versionId kindName) (S extra)
-
--- * Traverse the types to collect information about what
--- context the 'SafeCopy' instance will need.
+deriveSafeCopyHappstackData' :: Version a -> Name -> TypeQ -> Q [Dec]
+deriveSafeCopyHappstackData' versionId kindName typq = do
+  internalDeriveSafeCopy HappstackData versionId kindName typq
+
+-- * Type traversal.
 
 data DeriveType = Normal | Simple | HappstackData
 
 data R a =
   R { _deriveType :: DeriveType
     , _versionId :: Version a
-    , _kindName :: Name }
+    , _kindName :: Name
+    , _freeVars :: [Name]
+    , _params :: [Type]
+    -- , _bindings :: [(Name, Type)]
+    , _indent :: String }
+  deriving Generic
 
-type W = ()
-data S = S { _extraContext :: Cxt } deriving Generic
+type W = [Dec]
 
-class ExtraContext t where
-  extraContext :: t -> Q Cxt
+data S =
+  S { _extraContext :: Cxt
+    , _bindings :: [(Name, Type)]
+    } deriving Generic
 
--- | Generate SafeCopy constraints for a list of type variables
-instance ExtraContext Cxt where
-  extraContext context = pure context
+-- | Traverse a types to collect information about what context the
+-- 'SafeCopy' instance will need, and then output a declaration of the
+-- 'SafeCopy' instance.
+internalDeriveSafeCopy :: HasCallStack => DeriveType -> Version a -> Name -> TypeQ -> Q [Dec]
+internalDeriveSafeCopy deriveType versionId kindName typq = do
+  (S _ bindings, decs) <-
+    execRWST (doType =<< MTL.lift typq)
+      (R deriveType versionId kindName [] [] "") (S mempty [])
+  let decs' = everywhere (mkT (expand bindings)) decs
+  pure ({-trace ("decs=" <> vis decs' <> "\nbindings=" <> show bindings)-} decs')
 
-instance ExtraContext [TyVarBndr] where
-  extraContext tyvars =
-    sequence (fmap (\var -> [t|SafeCopy $(varT (tyVarName var))|]) tyvars)
+doType :: HasCallStack => Type -> RWST (R a) W S Q ()
+doType typ = -- traceLocM ("doType " <> ren typ) $
+  case typ of
+    ConT tyName -> doTypeName tyName
+    ForallT tyvars cxt' typ' -> do
+      #_extraContext %= (<> cxt')
+      local (over #_freeVars (fmap unKind tyvars <>)) $ doType typ'
+    AppT t1 t2 -> local (over #_params (t2 :)) $ doType t1
+    TupleT n -> doTypeName (tupleTypeName n)
+    _ -> fail $ "Can't derive SafeCopy instance for: " ++ show typ ++ " (" <> compactStack getStack <> ")"
 
-instance ExtraContext Name where
-  extraContext tyName =
-    reify tyName >>= \case
-      TyConI (DataD _cxt _name tyvars _kind _cons _derivs) -> extraContext tyvars
-      TyConI (NewtypeD _cxt _name tyvars _kind _con _derivs) -> extraContext tyvars
-      TyConI (TySynD _name _tyvars typ) -> extraContext typ
-      FamilyI _dec _insts -> pure []
-      info -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info) ++ " (1)"
+doTypeName :: Name -> RWST (R a) W S Q ()
+doTypeName tyName = -- traceLocM ("doTypeName " <> ren tyName) $
+  MTL.lift (reify tyName) >>= doInfo tyName
 
-instance ExtraContext TypeQ where
-  extraContext typq =
-    extraContext =<< typq
-
-instance ExtraContext Type where
-  extraContext typ =
-    case typ of
-      ConT tyName -> extraContext tyName
-      VarT tyName -> (:[]) <$> [t|SafeCopy $(varT tyName)|]
-      ForallT _tyvars context _typ -> pure context
-      AppT typ' param -> extraContext (typ', [param])
-      _ -> fail $ "Can't derive SafeCopy instance for: " ++ show typ <> " (2)"
-
--- | Unfolded type application
-instance ExtraContext (Type, [Type]) where
-  extraContext (AppT typ param, params) = extraContext (typ, (param : params))
-  extraContext (ListT, [param]) = extraContext param
-  extraContext (ConT tyName, _params) = extraContext tyName
-  extraContext (typ, _params) = fail $ "Can't derive SafeCopy instance for: " ++ show typ <> " (8)"
-
-instance ExtraContext Con where
-  extraContext (NormalC _name types) =
-    fmap mconcat (sequence <$> mapM extraContext (fmap snd types))
-  extraContext (RecC _name types) =
-    fmap mconcat (sequence <$> mapM extraContext (fmap (\(_, _, typ) -> typ) types))
-  extraContext (InfixC type1 _name type2) =
-    fmap mconcat (sequence <$> mapM extraContext [snd type1, snd type2])
-  extraContext (ForallC _tyvars context con) = (<>) <$> pure context <*> extraContext con
-  extraContext (GadtC _names _types _typ) = pure []
-  extraContext (RecGadtC _names _types _typ) = pure []
-
-internalDeriveSafeCopy :: TypeQ -> RWST (R a) W S Q [Dec]
-internalDeriveSafeCopy typq = do
-  MTL.lift typq >>= \case
-    ConT tyName -> doInfo tyName =<< MTL.lift (reify tyName)
-    ForallT _ cxt' typ' -> do
-      modify (\(S context) -> S (context <> cxt'))
-      internalDeriveSafeCopy (pure typ')
-    AppT t1 _t2 -> internalDeriveSafeCopy (pure t1)
-    TupleT n -> let tyName = tupleTypeName n in doInfo tyName =<< MTL.lift (reify tyName)
-    typ -> fail $ "Can't derive SafeCopy instance for: " ++ show typ ++ " (3)"
-
-doInfo :: Name -> Info -> RWST (R a) W S Q [Dec]
-doInfo tyName info =
+-- | Process the info obtained from a type name
+doInfo :: HasCallStack => Name -> Info -> RWST (R a) W S Q ()
+doInfo tyName info = -- traceLocM ("doInfo " <> ren tyName <> " (" <> ren info <> ")") $
   case info of
     TyConI (DataD context _name tyvars _kind cons _derivs)
       | length cons > 255 -> fail $ "Can't derive SafeCopy instance for: " ++ show tyName ++
                                     ". The datatype must have less than 256 constructors."
       | otherwise -> do
-          modify (\(S context') -> S (context' ++ context))
-          doCons tyName (ConT tyName) tyvars (zip [0..] cons)
+          #_extraContext %= (++ ({-traceLoc ("context=" <> ren context)-} context))
+          withBindings tyvars $ do
+            doCons tyName (ConT tyName) tyvars cons
 
     TyConI (NewtypeD context _name tyvars _kind con _derivs) -> do
-      modify (\(S context') -> S (context' <> context))
-      doCons tyName (ConT tyName) tyvars (zip [0..] [con])
+      #_extraContext %= (<> context)
+      withBindings tyvars $ do
+        doCons tyName (ConT tyName) tyvars [con]
 
     FamilyI _ insts -> do
-      concat <$> (forM insts $ withInst (ConT tyName) (doCons tyName))
-    _ -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info) ++ " (4)"
+      mapM_ (doInst tyName info . instCompat) insts
+    _ -> fail $ "Can't derive SafeCopy instance for: " ++ show (tyName, info) ++ " (" <> compactStack getStack <> ")"
 
-doCons :: Name -> Type -> [TyVarBndr] -> [(Integer, Con)] -> RWST (R a) W S Q [Dec]
+withBindings :: [TyVarBndr] -> RWST (R a) W S Q () -> RWST (R a) W S Q ()
+withBindings tyvars action = do
+  params <- view #_params
+  case length params <= length tyvars of
+    False -> fail $ "Arity error"
+    True -> do
+      let (tobind, remaining) = splitAt (length tyvars) params
+      let newbindings :: [(Name, Type)]
+          newbindings = zip (fmap unKind tyvars) tobind
+      #_bindings %= (newbindings <>)
+      local (set #_params remaining) $ action
+
+unKind :: TyVarBndr -> Name
+unKind (PlainTV name) = name
+unKind (KindedTV name _) = name
+
+doInst :: HasCallStack => Name -> Info -> Maybe (Cxt, Name, Type, Maybe Kind, [Con], [DerivClause]) -> RWST (R a) W S Q ()
+doInst _ info Nothing = fail $ "Can't derive SafeCopy instance for: " ++ show info
+doInst tyName _ (Just (context, _name, nty, _knd, cons, _derivs)) = do
+  #_extraContext %= (<> context)
+  doCons tyName nty [] cons
+
+doCons :: HasCallStack => Name -> Type -> [TyVarBndr] -> [Con] -> RWST (R a) W S Q ()
 doCons tyName tyBase tyvars cons = do
   let ty = foldl AppT tyBase (fmap (\var -> VarT $ tyVarName var) tyvars)
-  extra <- concat <$> mapM (MTL.lift . extraContext) (fmap snd cons)
-  S context <- get
+  mapM_ doCon cons
+  context <- use #_extraContext
   r <- ask
-  (:[]) <$> MTL.lift (instanceD (cxt (fmap pure (nub (context <> extra))))
-                      (pure (ConT ''SafeCopy `AppT` ty))
-                      [ mkPutCopy (_deriveType r) cons
-                      , mkGetCopy (_deriveType r) (renderTH (ppr . everywhere (mkT cleanName)) (ConT tyName)) cons
-                      , valD (varP 'version) (normalB $ litE $ integerL $ fromIntegral $ unVersion (_versionId r)) []
-                      , valD (varP 'kind) (normalB (varE (_kindName r))) []
-                      , funD 'errorTypeName [clause [wildP] (normalB $ litE $ StringL (renderTH (ppr . everywhere (mkT cleanName)) (ConT tyName))) []] ])
+  dec <- MTL.lift $
+    instanceD
+      (cxt (fmap pure (nub context)))
+      (pure (ConT ''SafeCopy `AppT` ty))
+      [ mkPutCopy (_deriveType r) (zip [0..] cons)
+      , mkGetCopy (_deriveType r) (renderTH (ppr . everywhere (mkT cleanName)) (ConT tyName)) (zip [0..] cons)
+      , valD (varP 'version) (normalB $ litE $ integerL $ fromIntegral $ unVersion (_versionId r)) []
+      , valD (varP 'kind) (normalB (varE (_kindName r))) []
+      , funD 'errorTypeName [clause [wildP] (normalB $ litE $ StringL (renderTH (ppr . everywhere (mkT cleanName)) (ConT tyName))) []] ]
+  tell [dec]
 
-withInst ::
-  (m ~ RWST (R a) W S Q, Monad m)
-  => Type
-  -> (Type -> [TyVarBndr] -> [(Integer, Con)] -> m r)
-  -> Dec
-  -> m r
-withInst typ worker inst =
-  case instCompat inst of
-    Just (context, _name, nty, _knd, cons, _derivs) -> do
-      modify (\(S context') -> S (context' <> context))
-      worker nty [] (zip [0..] cons)
-    Nothing -> fail $ "Can't derive SafeCopy instance for: " ++ show typ
+doCon :: HasCallStack => Con -> RWST (R a) W S Q ()
+doCon con = -- traceLocM ("doCon " <> ren con) $ do
+  withSubs con $ \case
+    NormalC _name types -> mapM_ doField (fmap snd types)
+    RecC _name types -> mapM_ doField (fmap (view _3) types)
+    InfixC type1 _name type2 -> doField (snd type1) >> doField (snd type2)
+    ForallC _tyvars context con' -> do
+      #_extraContext %= (<> ({-traceLoc ("context=" <> show context)-} context))
+      doCon con'
+    GadtC _names _types _typ -> pure ()
+    RecGadtC _name _types _typ -> pure ()
+
+withSubs :: Data t => t -> (t -> RWST (R a) W S Q ()) -> RWST (R a) W S Q ()
+withSubs a f = do
+  bindings <- use #_bindings
+  f (everywhere (mkT (expand bindings)) a)
+
+expand :: [(Name, Type)] -> Type -> Type
+expand bindings typ@(VarT name) =
+  case lookup name bindings of
+    Nothing -> typ
+    Just typ' -> {-trace ("sub: " <> show typ <> " -> " <> show typ')-} typ'
+expand _ typ = typ
+
+-- | Values which appear in the fields of the type, these need
+-- instances if they are polymorphic.
+doField :: HasCallStack => Type -> RWST (R a) W S Q ()
+doField typ = -- traceLocM ("doField " <> vis typ) $
+  case polymorphic typ of
+    False -> pure ()
+    True -> do
+      context <- MTL.lift [t|SafeCopy $(pure typ)|]
+      #_extraContext %= (context :)
+
+-- | If we don't encounter any type variables when traversing the type
+-- it is considered to be fixed, not polymorphic.  In that case we
+-- assume the required instance is already visible, so no context is
+-- needed.  If the instance is an orphan it might not be visible, so
+-- this would fail.
+polymorphic :: Type -> Bool
+polymorphic (ConT _tyName) = False
+polymorphic (VarT _tyName) = True
+polymorphic (ForallT _ _ typ) = polymorphic typ
+polymorphic (AppT typ param) = polymorphic param || polymorphic typ
+polymorphic ListT = False
+polymorphic (TupleT _) = False
+polymorphic typ = error ("polymorphic " <> (show typ))
 
 instCompat :: Dec -> Maybe (Cxt, Name, Type, Maybe Kind, [Con], [DerivClause])
 #if MIN_VERSION_template_haskell(2,15,0)
@@ -368,22 +417,16 @@ instCompat (NewtypeInstD context name ty knd con derivs) =
 #endif
 instCompat _inst = Nothing
 
--- | Render some declarations for the purpose of comparison in a unit
--- test.  This rendering will sometimes not actually compile.
-renderDecs :: [Dec] -> String
-renderDecs = renderTH (ppr . everywhere (mkT briefName))
-
 -- | Apply the TH pretty printer to a value after stripping any added
 -- suffixes from its names.  This may make it uncompilable, but it
 -- eliminates a source of randomness in the expected and actual test
 -- case results.
-renderTH :: Data a => (a -> Doc) -> a -> String
+renderTH :: {-Data a =>-} (a -> Doc) -> a -> String
 renderTH pretty decs =
-  -- fixNames $
   HPJ.renderStyle (HPJ.style {HPJ.lineLength = 1000000 {-HPJ.mode = HPJ.OneLineMode-}}) $
   to_HPJ_Doc $
   pretty $
-  {-fixText-} decs
+  decs
 
 -- | Names with the best chance of compiling when prettyprinted:
 --    * Remove all package and module names
@@ -397,15 +440,6 @@ cleanName (Name oc@(OccName _) (NameU _)) = Name oc NameS
 cleanName name@(Name _ (NameL _)) = name -- Not seeing any of these
 cleanName name@(Name _ NameS) = name
 
--- This will probably make the expression invalid, but it
--- removes random elements that will make tests fail.
-briefName :: Name -> Name
-briefName (Name oc (NameG _ns _pn _mn)) = Name oc NameS
-briefName (Name oc (NameQ _mn)) = Name oc NameS
-briefName (Name oc@(OccName _) (NameU _)) = Name oc NameS
-briefName name@(Name _ (NameL _)) = name -- Not seeing any of these
-briefName name@(Name _ NameS) = name
-
 #if MIN_VERSION_template_haskell(2,17,0)
 tyVarName :: TyVarBndr s -> Name
 tyVarName (PlainTV n _) = n
@@ -415,8 +449,8 @@ tyVarName :: TyVarBndr -> Name
 tyVarName (PlainTV n) = n
 tyVarName (KindedTV n _) = n
 #endif
-
--- * Build the method implementations
+
+-- * Build the methods of the SafeCopy instance.
 
 mkPutCopy :: DeriveType -> [(Integer, Con)] -> DecQ
 mkPutCopy deriveType cons = funD 'putCopy $ map mkPutClause cons
@@ -534,12 +568,49 @@ typeName (AppT t u)  = typeName t ++ typeName u
 typeName (SigT t _k) = typeName t
 typeName _           = "_"
 
-ws :: String
-ws = "(\t|\r|\n| |,)*"
-ch :: String
-ch = "'([^'\\\\]|\\\\')'"
-
--- * Versions of the derive functions that take an additional list of
+-- * Debugging
+
+traceLoc :: HasCallStack => String -> a -> a
+traceLoc s a =
+  trace (s <> " (" <> compactStack (drop 1 getStack) <> ")") a
+
+traceLocM :: HasCallStack => String -> RWST (R a) W S Q t -> RWST (R a) W S Q t
+traceLocM s t = do
+  indent <- view #_indent
+  params <- view #_params
+  bindings <- use #_bindings
+  local (\r@R{..} -> r {_indent = "  " <> _indent}) $
+    trace (indent <> s <> "\n" <>
+           indent <> "  --> params: [" <> intercalate ", " (fmap vis params) <> "]\n" <>
+           indent <> "  --> bindings: [" <> intercalate ", " (fmap (\(tv, ty) -> "(tv=" <> vis tv <> ", ty=" <> vis ty <> ")") bindings) <> "]\n" <>
+           indent <> "  --> stack: " <> compactStack (drop 1 getStack)) t
+
+ren :: (Data a, Ppr a) => a -> String
+ren = renderTH (ppr . everywhere (mkT briefName))
+
+vis :: (Data a, Ppr a) => a -> String
+vis = renderTH (ppr . everywhere (mkT briefName'))
+
+-- This will probably make the expression invalid, but it
+-- removes random elements that will make tests fail.
+briefName :: Name -> Name
+briefName (Name oc (NameG _ns _pn _mn)) = Name oc NameS
+briefName (Name oc (NameQ _mn)) = Name oc NameS
+briefName (Name oc@(OccName _) (NameU _)) = Name oc NameS
+briefName name@(Name _ (NameL _)) = name -- Not seeing any of these
+briefName name@(Name _ NameS) = name
+
+briefName' :: Name -> Name
+briefName' name@(Name oc _nf) | oc == OccName "db" = visName name
+briefName' name = briefName name
+
+visName :: Name -> Name
+visName (Name oc nf) =
+  Name (OccName ("(Name (" <> show oc <> ") (" <> show nf <> "))")) NameS
+
+-- * Old versions of the derive function.
+
+-- Versions of the derive functions that take an additional list of
 -- type names, not 100% clear what this is for.  I'm hoping the
 -- changes to the regular version will supercede these.
 
