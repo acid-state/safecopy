@@ -23,8 +23,7 @@ module Data.SafeCopy.Derive
 
 import Data.Generics.Labels ()
 import Data.Serialize (getWord8, putWord8, label)
-import Data.SafeCopy.Internal (Version(unVersion), SafeCopy(version, kind, errorTypeName, getCopy, putCopy), contain, getSafePut, getSafeGet, safeGet, safePut,)
-
+import Data.SafeCopy.SafeCopy (Version(unVersion), SafeCopy(version, kind, errorTypeName, getCopy, putCopy), contain, getSafePut, getSafeGet, safeGet, safePut)
 import Language.Haskell.TH hiding (Kind)
 import Control.Lens ((%=), _3, over, set, use, view)
 import Control.Monad
