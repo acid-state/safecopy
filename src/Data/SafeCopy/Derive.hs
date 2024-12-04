@@ -25,13 +25,14 @@ module Data.SafeCopy.Derive
   , renderDecs
   ) where
 
-import Data.Generics.Labels ()
+-- import Data.Generics.Labels ()
 import Data.Serialize (getWord8, putWord8, label)
 import Data.SafeCopy.SafeCopy (Version(unVersion), SafeCopy(version, kind, errorTypeName, getCopy, putCopy), contain, getSafePut, getSafeGet, safeGet, safePut)
 import Language.Haskell.TH hiding (Kind)
-import Control.Lens ((%=), _1, _3, over, set, to, use, view)
+import Control.Lens ((%=), _1, _3, makeLenses, over, set, to, use, view)
 import Control.Monad
-import Control.Monad.RWS as MTL (ask, execRWST, lift, local, RWST, tell)
+import Control.Monad.Trans.Class as MTL (lift)
+import Control.Monad.Trans.RWS.Lazy as MTL (ask, execRWST, local, RWST, tell)
 -- import Data.Data (Data)
 import Data.Generics (Data, everywhere, mkT)
 import Data.List (intercalate, intersperse, isPrefixOf, nub)
@@ -47,6 +48,27 @@ import Language.Haskell.TH.PprLib (Doc, to_HPJ_Doc)
 import Language.Haskell.TH.Syntax
 -- import SeeReason.SrcLoc (compactStack)
 import qualified Text.PrettyPrint as HPJ
+
+data DeriveType = Normal | Simple | HappstackData
+
+data R a =
+  R { _deriveType :: DeriveType
+    , _versionId :: Version a
+    , _kindName :: Name
+    , _freeVars :: [Name]
+    , _params :: [Type]
+    -- , _bindings :: [(Name, Type)]
+    , _indent :: String }
+
+type W = [Dec]
+
+data S =
+  S { _extraContext :: Cxt
+    , _bindings :: [(Name, Type)]
+    }
+
+$(makeLenses ''R)
+$(makeLenses ''S)
 
 -- | Derive an instance of 'SafeCopy'.
 --
@@ -254,25 +276,6 @@ deriveSafeCopyHappstackData' versionId kindName typq = do
 
 -- * Type traversal.
 
-data DeriveType = Normal | Simple | HappstackData
-
-data R a =
-  R { _deriveType :: DeriveType
-    , _versionId :: Version a
-    , _kindName :: Name
-    , _freeVars :: [Name]
-    , _params :: [Type]
-    -- , _bindings :: [(Name, Type)]
-    , _indent :: String }
-  deriving Generic
-
-type W = [Dec]
-
-data S =
-  S { _extraContext :: Cxt
-    , _bindings :: [(Name, Type)]
-    } deriving Generic
-
 -- | Traverse a types to collect information about what context the
 -- 'SafeCopy' instance will need, and then output a declaration of the
 -- 'SafeCopy' instance.
@@ -289,9 +292,9 @@ doType typ = -- traceLocM ("doType " <> ren typ) $
   case typ of
     ConT tyName -> doTypeName tyName
     ForallT tyvars cxt' typ' -> do
-      #_extraContext %= (<> cxt')
-      local (over #_freeVars (fmap unKind tyvars <>)) $ doType typ'
-    AppT t1 t2 -> local (over #_params (t2 :)) $ doType t1
+      extraContext %= (<> cxt')
+      local (over freeVars (fmap unKind tyvars <>)) $ doType typ'
+    AppT t1 t2 -> local (over params (t2 :)) $ doType t1
     TupleT n -> doTypeName (tupleTypeName n)
     _ -> fail $ "Can't derive SafeCopy instance for: " ++ show typ -- ++ " (" <> compactStack getStack <> ")"
 
@@ -307,12 +310,12 @@ doInfo tyName info = -- traceLocM ("doInfo " <> ren tyName <> " (" <> ren info <
       | length cons > 255 -> fail $ "Can't derive SafeCopy instance for: " ++ show tyName ++
                                     ". The datatype must have less than 256 constructors."
       | otherwise -> do
-          #_extraContext %= (++ ({-traceLoc ("context=" <> ren context)-} context))
+          extraContext %= (++ ({-traceLoc ("context=" <> ren context)-} context))
           withBindings tyvars $ do
             doCons tyName (ConT tyName) tyvars cons
 
     TyConI (NewtypeD context _name tyvars _kind con _derivs) -> do
-      #_extraContext %= (<> context)
+      extraContext %= (<> context)
       withBindings tyvars $ do
         doCons tyName (ConT tyName) tyvars [con]
 
@@ -322,15 +325,15 @@ doInfo tyName info = -- traceLocM ("doInfo " <> ren tyName <> " (" <> ren info <
 
 withBindings :: [TyVarBndr] -> RWST (R a) W S Q () -> RWST (R a) W S Q ()
 withBindings tyvars action = do
-  params <- view #_params
-  case length params <= length tyvars of
+  ps <- view params
+  case length ps <= length tyvars of
     False -> fail $ "Arity error"
     True -> do
-      let (tobind, remaining) = splitAt (length tyvars) params
+      let (tobind, remaining) = splitAt (length tyvars) ps
       let newbindings :: [(Name, Type)]
           newbindings = zip (fmap unKind tyvars) tobind
-      #_bindings %= (newbindings <>)
-      local (set #_params remaining) $ action
+      bindings %= (newbindings <>)
+      local (set params remaining) $ action
 
 unKind :: TyVarBndr -> Name
 unKind (PlainTV name) = name
@@ -339,14 +342,14 @@ unKind (KindedTV name _) = name
 doInst :: HasCallStack => Name -> Info -> Maybe (Cxt, Name, Type, Maybe Kind, [Con], [DerivClause]) -> RWST (R a) W S Q ()
 doInst _ info Nothing = fail $ "Can't derive SafeCopy instance for: " ++ show info
 doInst tyName _ (Just (context, _name, nty, _knd, cons, _derivs)) = do
-  #_extraContext %= (<> context)
+  extraContext %= (<> context)
   doCons tyName nty [] cons
 
 doCons :: HasCallStack => Name -> Type -> [TyVarBndr] -> [Con] -> RWST (R a) W S Q ()
 doCons tyName tyBase tyvars cons = do
   let ty = foldl AppT tyBase (fmap (\var -> VarT $ tyVarName var) tyvars)
   mapM_ doCon cons
-  context <- use #_extraContext
+  context <- use extraContext
   r <- ask
   dec <- MTL.lift $
     instanceD
@@ -366,15 +369,15 @@ doCon con = -- traceLocM ("doCon " <> ren con) $ do
     RecC _name types -> mapM_ doField (fmap (view _3) types)
     InfixC type1 _name type2 -> doField (snd type1) >> doField (snd type2)
     ForallC _tyvars context con' -> do
-      #_extraContext %= (<> ({-traceLoc ("context=" <> show context)-} context))
+      extraContext %= (<> ({-traceLoc ("context=" <> show context)-} context))
       doCon con'
     GadtC _names _types _typ -> pure ()
     RecGadtC _name _types _typ -> pure ()
 
 withSubs :: Data t => t -> (t -> RWST (R a) W S Q ()) -> RWST (R a) W S Q ()
 withSubs a f = do
-  bindings <- use #_bindings
-  f (everywhere (mkT (expand bindings)) a)
+  bnd <- use bindings
+  f (everywhere (mkT (expand bnd)) a)
 
 expand :: [(Name, Type)] -> Type -> Type
 expand bindings typ@(VarT name) =
@@ -391,7 +394,7 @@ doField typ = -- traceLocM ("doField " <> vis typ) $
     False -> pure ()
     True -> do
       context <- MTL.lift [t|SafeCopy $(pure typ)|]
-      #_extraContext %= (<> [context])
+      extraContext %= (<> [context])
 
 -- | If we don't encounter any type variables when traversing the type
 -- it is considered to be fixed, not polymorphic.  In that case we
@@ -583,14 +586,14 @@ traceLoc s a =
 
 traceLocM :: HasCallStack => String -> RWST (R a) W S Q t -> RWST (R a) W S Q t
 traceLocM s t = do
-  indent <- view #_indent
-  params <- view #_params
-  bindings <- use #_bindings
-  local (over #_indent ("  " <>)) $
-    trace (indent <> s <> "\n" <>
-           indent <> "  --> params: [" <> intercalate ", " (fmap vis params) <> "]\n" <>
-           indent <> "  --> bindings: [" <> intercalate ", " (fmap (\(tv, ty) -> "(tv=" <> vis tv <> ", ty=" <> vis ty <> ")") bindings) <> "]\n" <>
-           indent <> "  --> stack: " <> compactStack ({-drop 1-} getStack)) t
+  ind <- view indent
+  ps <- view params
+  bindings <- use bindings
+  local (over indent ("  " <>)) $
+    trace (ind <> s <> "\n" <>
+           ind <> "  --> params: [" <> intercalate ", " (fmap vis ps) <> "]\n" <>
+           ind <> "  --> bindings: [" <> intercalate ", " (fmap (\(tv, ty) -> "(tv=" <> vis tv <> ", ty=" <> vis ty <> ")") bindings) <> "]\n" <>
+           ind <> "  --> stack: " <> compactStack ({-drop 1-} getStack)) t
 
 ren :: (Data a, Ppr a) => a -> String
 ren = renderTH (ppr . everywhere (mkT briefName))

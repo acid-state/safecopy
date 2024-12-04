@@ -46,10 +46,10 @@ Library
                          -- cereal 0.5.3 introduced instance Monoid Put
                        bytestring < 0.13,
                        containers >= 0.3 && < 0.8,
+                       -- Used to implement the default getCopy/putCopy implementations
                        generic-data >= 0.3.0.0,
-                       generic-lens,
+                       -- generic-lens,
                        lens,
-                       mtl,
                        old-time < 1.2,
                        pretty,
                        syb,
