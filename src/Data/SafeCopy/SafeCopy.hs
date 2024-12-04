@@ -34,6 +34,8 @@ import qualified Control.Monad.Trans.State as State (get)
 import Control.Monad.Trans.RWS as RWS (evalRWST, modify, RWST, tell)
 import qualified Control.Monad.Trans.RWS as RWS (get)
 import Data.Bits (shiftR)
+import qualified Data.ByteString.Lazy.Char8 as L
+import qualified Data.ByteString.Char8 as B
 import Data.Int (Int32)
 import Data.List
 import Data.Map as Map (Map, lookup, insert)
@@ -42,6 +44,7 @@ import Data.Set as Set (insert, member, Set)
 import Data.Typeable (Typeable, TypeRep, typeOf, typeRep)
 import Data.Word (Word8)
 import GHC.Generics
+import GHC.Stack (HasCallStack)
 import Generic.Data as G (Constructors, gconIndex, gconNum)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -251,7 +254,7 @@ instance GGetFields f p => GGetCopy (M1 C c f) p where
 
 -- append constructor fields
 class GGetFields f p where
-    ggetFields :: p -> StateT (Map TypeRep Int32) Get (Get (f a))
+    ggetFields :: HasCallStack => p -> StateT (Map TypeRep Int32) Get (Get (f a))
 
 instance (GGetFields f p, GGetFields g p) => GGetFields (f :*: g) p where
     ggetFields p = do
@@ -290,7 +293,7 @@ data DatatypeInfo =
 -- read a version or not.  It constructs a Map TypeRep Int32 and reads
 -- when the new TypeRep is not in the map.
 getSafeGetGeneric ::
-  forall a. SafeCopy a
+  forall a. (SafeCopy a, HasCallStack)
   => StateT (Map TypeRep Int32) Get (Get a)
 getSafeGetGeneric
     = checkConsistency proxy $
@@ -341,7 +344,7 @@ putCopyDefault :: forall a. GSafeCopy a => a -> Contained Put
 putCopyDefault a = (contain . gputCopy (ConstructorInfo (fromIntegral (gconNum @a)) (fromIntegral (gconIndex a))) . from) a
 
 -- constructGetterFromVersion :: SafeCopy a => Version a -> Kind (MigrateFrom (Reverse a)) -> Get (Get a)
-constructGetterFromVersion :: SafeCopy a => Version a -> Kind a -> Either String (Get a)
+constructGetterFromVersion :: (SafeCopy a, HasCallStack) => Version a -> Kind a -> Either String (Get a)
 constructGetterFromVersion diskVersion orig_kind =
   worker False diskVersion orig_kind
   where
@@ -382,14 +385,14 @@ constructGetterFromVersion diskVersion orig_kind =
 
 -- | Parse a version tagged data type and then migrate it to the desired type.
 --   Any serialized value has been extended by the return type can be parsed.
-safeGet :: SafeCopy a => Get a
+safeGet :: (SafeCopy a, HasCallStack) => Get a
 safeGet
     = join getSafeGet
 
 -- | Parse a version tag and return the corresponding migrated parser. This is
 --   useful when you can prove that multiple values have the same version.
 --   See 'getSafePut'.
-getSafeGet :: forall a. SafeCopy a => Get (Get a)
+getSafeGet :: forall a. (SafeCopy a, HasCallStack) => Get (Get a)
 getSafeGet
     = checkConsistency proxy $
       case kindFromProxy proxy of
@@ -403,14 +406,14 @@ getSafeGet
 -- | Serialize a data type by first writing out its version tag. This is much
 --   simpler than the corresponding 'safeGet' since previous versions don't
 --   come into play.
-safePut :: SafeCopy a => a -> Put
+safePut :: (SafeCopy a, HasCallStack) => a -> Put
 safePut a
     = do putter <- getSafePut
          putter a
 
 -- | Serialize the version tag and return the associated putter. This is useful
 --   when serializing multiple values with the same version. See 'getSafeGet'.
-getSafePut :: forall a. SafeCopy a => PutM (a -> Put)
+getSafePut :: forall a. (SafeCopy a, HasCallStack) => PutM (a -> Put)
 getSafePut
     = unpureCheckConsistency proxy $
       case kindFromProxy proxy of
@@ -574,6 +577,27 @@ isObviouslyConsistent :: Kind a -> Bool
 isObviouslyConsistent Primitive = True
 isObviouslyConsistent Base      = True
 isObviouslyConsistent _         = False
+
+-------------------------------------------------
+-- Some SafeCopy versions of Serialize functions.
+
+-- | Encode a value using binary serialization to a strict ByteString.
+safeEncode :: (SafeCopy a, HasCallStack) => a -> B.ByteString
+safeEncode = runPut . safePut
+
+-- | Encode a value using binary serialization to a lazy ByteString.
+safeEncodeLazy :: (SafeCopy a, HasCallStack) => a -> L.ByteString
+safeEncodeLazy  = runPutLazy . safePut
+
+-- | Decode a value from a strict ByteString, reconstructing the original
+-- structure.
+safeDecode :: (SafeCopy a, HasCallStack) => B.ByteString -> Either String a
+safeDecode = runGet safeGet
+
+-- | Decode a value from a lazy ByteString, reconstructing the original
+-- structure.
+safeDecodeLazy :: (SafeCopy a, HasCallStack) => L.ByteString -> Either String a
+safeDecodeLazy  = runGetLazy safeGet
 
 -------------------------------------------------
 -- Small utility functions that mean we don't
