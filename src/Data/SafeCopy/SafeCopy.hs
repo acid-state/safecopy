@@ -116,12 +116,12 @@ class Typeable a => SafeCopy a where
     -- | This method defines how a value should be parsed without also worrying
     --   about writing out the version tag. This function cannot be used directly.
     --   One should use 'safeGet', instead.
-    getCopy  :: HasCallStack => Contained (Get a)
+    getCopy  :: Contained (Get a)
 
     -- | This method defines how a value should be parsed without worrying about
     --   previous versions or migrations. This function cannot be used directly.
     --   One should use 'safePut, instead.
-    putCopy  :: HasCallStack => a -> Contained Put
+    putCopy  :: a -> Contained Put
 
     -- | Internal function that should not be overrided.
     --   @Consistent@ iff the version history is consistent

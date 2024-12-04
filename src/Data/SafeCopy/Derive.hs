@@ -20,6 +20,8 @@ module Data.SafeCopy.Derive
   , deriveSafeCopySimpleIndexedType'
   , deriveSafeCopyHappstackDataIndexedType
   , deriveSafeCopyHappstackDataIndexedType'
+  , renderTH
+  , renderDecs
   ) where
 
 import Data.Generics.Labels ()
@@ -426,6 +428,9 @@ renderTH pretty decs =
   to_HPJ_Doc $
   pretty $
   decs
+
+renderDecs :: [Dec] -> String
+renderDecs = renderTH (ppr . everywhere (mkT briefName))
 
 -- | Names with the best chance of compiling when prettyprinted:
 --    * Remove all package and module names
