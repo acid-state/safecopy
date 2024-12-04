@@ -339,9 +339,9 @@ unKind :: TyVarBndr -> Name
 unKind (PlainTV name) = name
 unKind (KindedTV name _) = name
 
-doInst :: HasCallStack => Name -> Info -> Maybe (Cxt, Name, Type, Maybe Kind, [Con], [DerivClause]) -> RWST (R a) W S Q ()
+doInst :: HasCallStack => Name -> Info -> Maybe (Cxt, Type, Maybe Kind, [Con], [DerivClause]) -> RWST (R a) W S Q ()
 doInst _ info Nothing = fail $ "Can't derive SafeCopy instance for: " ++ show info
-doInst tyName _ (Just (context, _name, nty, _knd, cons, _derivs)) = do
+doInst tyName _ (Just (context, nty, _knd, cons, _derivs)) = do
   extraContext %= (<> context)
   doCons tyName nty [] cons
 
@@ -410,17 +410,17 @@ polymorphic ListT = False
 polymorphic (TupleT _) = False
 polymorphic typ = error ("polymorphic " <> (show typ))
 
-instCompat :: Dec -> Maybe (Cxt, Name, Type, Maybe Kind, [Con], [DerivClause])
+instCompat :: Dec -> Maybe (Cxt, Type, Maybe Kind, [Con], [DerivClause])
 #if MIN_VERSION_template_haskell(2,15,0)
 instCompat (DataInstD context name nty knd cons derivs) =
-  Just (context, name, nty, knd, cons, derivs)
+  Just (context, nty, knd, cons, derivs)
 instCompat (NewtypeInstD context name nty knd con derivs) =
-  Just (context, name, nty, knd, [con], derivs)
+  Just (context, nty, knd, [con], derivs)
 #else
 instCompat (DataInstD context name ty knd cons derivs) =
-  Just (context, name, foldl AppT (ConT name) ty, knd, cons, derivs)
+  Just (context, foldl AppT (ConT name) ty, knd, cons, derivs)
 instCompat (NewtypeInstD context name ty knd con derivs) =
-  Just (context, name, foldl AppT (ConT name) ty, knd, [con], derivs)
+  Just (context, foldl AppT (ConT name) ty, knd, [con], derivs)
 #endif
 instCompat _inst = Nothing
 
