@@ -123,8 +123,9 @@ main = defaultMain $ testGroup "SafeCopy instances"
     , deriveTests ]
 
 
+-- | A smattering of test cases.
 deriveTests =
-  testGroup "deriveSafeCopy'"
+  testGroup "deriveSafeCopy"
     [ testCase "deriveSafeCopy 0 'base ''(,,,,,,,)" $ do
           let decs = $(do addDependentFile "src/Data/SafeCopy/Derive.hs"
                           lift =<< deriveSafeCopy 0 'base ''(,,,,,,,))
@@ -135,6 +136,7 @@ deriveTests =
              "          version = 0",
              "          kind = base",
              "          errorTypeName _ = \"GHC.Tuple.(,,,,,,,)\""]
+      -- Test passing a type to deriveSafeCopy' instead of a Name.
       , testCase "deriveSafeCopy' 0 'base [t(,,,,,,,)|]" $ do
           let decs = $(do addDependentFile "src/Data/SafeCopy/Derive.hs"
                           lift =<< deriveSafeCopy' 0 'base [t|forall a b c d e f g h. (Show a, Typeable a) => (a,b,c,d,e,f,g,h)|])
@@ -145,6 +147,7 @@ deriveTests =
              "          version = 0",
              "          kind = base",
              "          errorTypeName _ = \"GHC.Tuple.(,,,,,,,)\""]
+      -- A type with a type parameter results in some context.
       , testCase "deriveSafeCopy' 0 'base (ClientView db)" $ do
           let decs = $(do addDependentFile "src/Data/SafeCopy/Derive.hs"
                           lift =<< deriveSafeCopy' 0 'base [t|forall db. ClientView db|])
@@ -155,6 +158,8 @@ deriveTests =
              "          version = 0",
              "          kind = base",
              "          errorTypeName _ = \"Types.ClientView\""]
+      -- There is a hidden forall type parameter inside SearchTerm, so
+      -- context is generated here.
       , testCase "deriveSafeCopy' 0 'base SearchTerm" $ do
           let decs = $(do addDependentFile "src/Data/SafeCopy/Derive.hs"
                           lift =<< deriveSafeCopy' 0 'base [t|SearchTerm|])
