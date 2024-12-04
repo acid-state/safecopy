@@ -710,7 +710,7 @@ withInst2 ::
 #if MIN_VERSION_template_haskell(2,15,0)
 withInst2 typ worker (DataInstD context _ nty _ cons _) =
   worker nty context [] (zip [0..] cons)
-withInst2 typ worker (NewtypeInstD context _ ty _ con _) =
+withInst2 typ worker (NewtypeInstD context _ nty _ con _) =
   worker nty context [] (zip [0..] [con])
 #else
 withInst2 typ worker (DataInstD context _ ty _ cons _) =
