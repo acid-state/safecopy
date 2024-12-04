@@ -391,7 +391,7 @@ doField typ = -- traceLocM ("doField " <> vis typ) $
     False -> pure ()
     True -> do
       context <- MTL.lift [t|SafeCopy $(pure typ)|]
-      #_extraContext %= (context :)
+      #_extraContext %= (<> [context])
 
 -- | If we don't encounter any type variables when traversing the type
 -- it is considered to be fixed, not polymorphic.  In that case we

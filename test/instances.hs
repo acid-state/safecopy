@@ -159,7 +159,7 @@ deriveTests =
           let decs = $(do addDependentFile "src/Data/SafeCopy/Derive.hs"
                           lift =<< deriveSafeCopy' 0 'base [t|SearchTerm|])
           renderDecs decs @?= intercalate "\n"
-            ["instance SafeCopy ([CI Text]) => SafeCopy SearchTerm",
+            ["instance SafeCopy SearchTerm",
              "    where putCopy (SearchTerm a1) = contain (do {putWord8 0; safePut_ListaListChar <- getSafePut; safePut_ListaListChar a1; return ()})",
              "          putCopy (NoTerm) = contain (do {putWord8 1; return ()})",
              "          getCopy = contain (label \"Types.SearchTerm:\" (do {tag <- getWord8;",
