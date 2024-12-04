@@ -2,8 +2,9 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NoOverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -28,21 +29,23 @@ import Data.Generics.Labels ()
 import Data.Serialize (getWord8, putWord8, label)
 import Data.SafeCopy.SafeCopy (Version(unVersion), SafeCopy(version, kind, errorTypeName, getCopy, putCopy), contain, getSafePut, getSafeGet, safeGet, safePut)
 import Language.Haskell.TH hiding (Kind)
-import Control.Lens ((%=), _3, over, set, use, view)
+import Control.Lens ((%=), _1, _3, over, set, to, use, view)
 import Control.Monad
 import Control.Monad.RWS as MTL (ask, execRWST, lift, local, RWST, tell)
 -- import Data.Data (Data)
 import Data.Generics (Data, everywhere, mkT)
-import Data.List ({-intercalate,-} nub)
+import Data.List (intercalate, intersperse, isPrefixOf, nub)
 import Data.Maybe (fromMaybe)
+import Data.String (IsString(fromString))
 #ifdef __HADDOCK__
 import Data.Word (Word8) -- Haddock
 #endif
--- import Debug.Trace
+import Debug.Trace
 import GHC.Generics (Generic)
-import GHC.Stack (HasCallStack)
+import GHC.Stack (callStack, getCallStack, HasCallStack, SrcLoc(..))
 import Language.Haskell.TH.PprLib (Doc, to_HPJ_Doc)
 import Language.Haskell.TH.Syntax
+-- import SeeReason.SrcLoc (compactStack)
 import qualified Text.PrettyPrint as HPJ
 
 -- | Derive an instance of 'SafeCopy'.
@@ -574,10 +577,9 @@ typeName _           = "_"
 
 -- * Debugging
 
-#if 0
 traceLoc :: HasCallStack => String -> a -> a
 traceLoc s a =
-  trace (s <> " (" <> compactStack (drop 1 getStack) <> ")") a
+  trace (s <> " (" <> compactStack getStack <> ")") a
 
 traceLocM :: HasCallStack => String -> RWST (R a) W S Q t -> RWST (R a) W S Q t
 traceLocM s t = do
@@ -588,8 +590,7 @@ traceLocM s t = do
     trace (indent <> s <> "\n" <>
            indent <> "  --> params: [" <> intercalate ", " (fmap vis params) <> "]\n" <>
            indent <> "  --> bindings: [" <> intercalate ", " (fmap (\(tv, ty) -> "(tv=" <> vis tv <> ", ty=" <> vis ty <> ")") bindings) <> "]\n" <>
-           indent <> "  --> stack: " <> compactStack (drop 1 getStack)) t
-#endif
+           indent <> "  --> stack: " <> compactStack ({-drop 1-} getStack)) t
 
 ren :: (Data a, Ppr a) => a -> String
 ren = renderTH (ppr . everywhere (mkT briefName))
@@ -613,6 +614,47 @@ briefName' name = briefName name
 visName :: Name -> Name
 visName (Name oc nf) =
   Name (OccName ("(Name (" <> show oc <> ") (" <> show nf <> "))")) NameS
+
+-- | Stack with main last.  Bottom frame includes the function name.
+-- Top frame includes the column number.
+compactStack :: forall s. (IsString s, Monoid s, HasCallStack) => [(String, SrcLoc)] -> s
+compactStack = mconcat . intersperse (" < " :: s) . compactLocs
+
+compactLocs :: forall s. (IsString s, Monoid s, HasCallStack) => [(String, SrcLoc)] -> [s]
+compactLocs [] = ["(no CallStack)"]
+compactLocs [(callee, loc)] = [fromString callee, srcloccol loc]
+compactLocs [(_, loc), (caller, _)] = [srcloccol loc <> "." <> fromString caller]
+compactLocs ((_, loc) : more@((caller, _) : _)) =
+  srcfunloc loc (fromString caller) : stacktail (fmap snd more)
+  where
+    stacktail :: [SrcLoc] -> [s]
+    stacktail [] = []
+    -- Include the column number of the last item, it may help to
+    -- figure out which caller is missing the HasCallStack constraint.
+    stacktail [loc'] = [srcloccol loc']
+    stacktail (loc' : more') = srcloc loc' : stacktail more'
+
+-- | With start column
+srcloccol :: (HasCallStack, IsString s, Semigroup s) => SrcLoc -> s
+srcloccol loc = srcloc loc <> ":" <> fromString (show (srcLocStartCol loc))
+
+-- | Compactly format a source location
+srcloc :: (IsString s, Semigroup s) => SrcLoc -> s
+srcloc loc = fromString (srcLocModule loc) <> ":" <> fromString (show (srcLocStartLine loc))
+
+-- | Compactly format a source location with a function name
+srcfunloc :: (IsString s, Semigroup s) => SrcLoc -> s -> s
+srcfunloc loc f = fromString (srcLocModule loc) <> "." <> f <> ":" <> fromString (show (srcLocStartLine loc))
+
+-- | Get the portion of the stack before we entered any SeeReason.Log module.
+getStack :: HasCallStack => [(String, SrcLoc)]
+getStack = dropBoringFrames $ getCallStack callStack
+  where
+    dropBoringFrames :: [(String, SrcLoc)] -> [(String, SrcLoc)]
+    dropBoringFrames = dropWhile (view (_1 . to (`elem` ["getStack", "traceLocM"])))
+
+isThisPackage :: String -> Bool
+isThisPackage s = trace ("isThisPackage " <> show s) False
 
 -- * Old versions of the derive function.
 
