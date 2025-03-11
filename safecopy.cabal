@@ -1,6 +1,6 @@
 Name:                safecopy
 Version:             0.10.4.2
-x-revision:          10
+x-revision:          11
 Synopsis:            Binary serialization with version control.
 Description:         An extension to Data.Serialize with built-in version control.
 Homepage:            https://github.com/acid-state/safecopy
@@ -10,13 +10,14 @@ Maintainer:          Lemmih <lemmih@gmail.com>, David Fox <dsf@seereason.com>
 -- Copyright:
 Category:            Data, Parsing
 Build-type:          Simple
-Extra-source-files: CHANGELOG.md
+Extra-source-files:  CHANGELOG.md
 Cabal-version:       >=1.10
 
 tested-with:
+  GHC == 9.12.1
   GHC == 9.10.1
-  GHC == 9.8.2
-  GHC == 9.6.5
+  GHC == 9.8.4
+  GHC == 9.6.6
   GHC == 9.4.8
   GHC == 9.2.8
   GHC == 9.0.2
@@ -34,29 +35,27 @@ Source-repository head
 
 Library
   Default-language:    Haskell2010
-  -- Modules exported by the library.
   Exposed-modules:     Data.SafeCopy
                        Data.SafeCopy.Internal
 
   Hs-Source-Dirs:      src/
 
-  -- Packages needed in order to build this package.
-  Build-depends:       base >= 4.9 && < 5,
-                       array < 0.6,
-                       cereal >= 0.5.3 && < 0.6,
-                         -- cereal 0.5.3 introduced instance Monoid Put
-                       bytestring < 0.13,
-                       generic-data >= 0.3.0.0,
-                       containers >= 0.3 && < 0.8,
-                       old-time < 1.2,
-                       template-haskell >= 2.11.0.0 && < 2.23,
-                       text < 1.3 || >= 2.0 && < 2.2,
-                       time >= 1.6.0.1 && < 1.15,
-                       transformers < 0.7,
-                       vector >= 0.10 && < 0.14
+  -- Lower bounds are chosen to match LTS 7.24 (GHC 8.0)
+  Build-depends:       base             >= 4.9       && < 5
+                     , array            >= 0.5.1.1   && < 0.6
+                     , cereal           >= 0.5.4.0   && < 0.6
+                     , bytestring       >= 0.10.8.1  && < 0.13
+                     , generic-data     >= 0.3.0.0   && < 2
+                     , containers       >= 0.5.7.1   && < 1
+                     , old-time         >= 1.1.0.3   && < 1.2
+                     , template-haskell >= 2.11.0.0  && < 2.24
+                     , text             >= 1.2.2.2   && < 1.3 || >= 2.0 && < 2.2
+                     , time             >= 1.6.0.1   && < 1.15
+                     , transformers     >= 0.5.2.0   && < 0.7
+                     , vector           >= 0.11.0.0  && < 0.14
 
-  -- Modules not exported by this package.
-  Other-modules:       Data.SafeCopy.Instances, Data.SafeCopy.SafeCopy,
+  Other-modules:       Data.SafeCopy.Instances
+                       Data.SafeCopy.SafeCopy
                        Data.SafeCopy.Derive
 
   GHC-Options:         -Wall
@@ -69,9 +68,17 @@ Test-suite instances
   Main-is:             instances.hs
   Hs-Source-Dirs:      test/
   GHC-Options:         -Wall -threaded -rtsopts -with-rtsopts=-N
-  Build-depends:       base, cereal, template-haskell, safecopy,
-                       containers, time, array, vector, lens >= 4.7 && < 6,
-                       lens-action
+  Build-depends:       base
+                     , array
+                     , cereal
+                     , containers
+                     , safecopy
+                     , template-haskell
+                     , time
+                     , vector
+                     -- new dependencies:
+                     , lens >= 4.7 && < 6
+                     , lens-action
                      , tasty
                      , tasty-quickcheck
                      , quickcheck-instances
@@ -83,4 +90,8 @@ Test-suite generic
   Main-is:             generic.hs
   Hs-Source-Dirs:      test/
   GHC-Options:         -Wall -threaded -rtsopts -with-rtsopts=-N
-  Build-depends:       base, bytestring, cereal, safecopy, HUnit
+  Build-depends:       base
+                     , bytestring
+                     , cereal
+                     , safecopy
+                     , HUnit

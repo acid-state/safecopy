@@ -2,3 +2,4 @@
 /.stack-work/
 *.nix
 stack*.yaml.lock
+*~

@@ -1,11 +1,11 @@
 branches: master
 installed: +all
 
-constraint-set lens-5.3.1
-  ghc: >= 8.0 && < 9.10
-  constraints: lens ^>= 5.3.1
+constraint-set containers-0.8
+  ghc: >= 8.2
+  constraints: containers ^>= 0.8
   tests: True
   run-tests: True
 
 raw-project
-  allow-newer: lens
+  allow-newer: containers
