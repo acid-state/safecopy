@@ -1,6 +1,6 @@
+Cabal-version:       1.18
 Name:                safecopy
-Version:             0.10.4.2
-x-revision:          12
+Version:             0.10.4.3
 Synopsis:            Binary serialization with version control.
 Description:         An extension to Data.Serialize with built-in version control.
 Homepage:            https://github.com/acid-state/safecopy
@@ -10,8 +10,8 @@ Maintainer:          Lemmih <lemmih@gmail.com>, David Fox <dsf@seereason.com>
 -- Copyright:
 Category:            Data, Parsing
 Build-type:          Simple
-Extra-source-files:  CHANGELOG.md
-Cabal-version:       >=1.10
+
+Extra-doc-files:  CHANGELOG.md
 
 tested-with:
   GHC == 9.14.1
