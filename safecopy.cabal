@@ -82,8 +82,6 @@ Test-suite instances
                      , lens-action
                      , tasty
                      , tasty-quickcheck
-                     , quickcheck-instances
-                     , QuickCheck >= 2.8.2 && < 3
 
 Test-suite generic
   Default-language:    Haskell2010
