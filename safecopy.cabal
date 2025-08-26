@@ -1,6 +1,6 @@
 Name:                safecopy
 Version:             0.10.4.2
-x-revision:          11
+x-revision:          12
 Synopsis:            Binary serialization with version control.
 Description:         An extension to Data.Serialize with built-in version control.
 Homepage:            https://github.com/acid-state/safecopy
@@ -49,9 +49,9 @@ Library
                      , generic-data     >= 0.3.0.0   && < 2
                      , containers       >= 0.5.7.1   && < 1
                      , old-time         >= 1.1.0.3   && < 1.2
-                     , template-haskell >= 2.11.0.0  && < 2.24
+                     , template-haskell >= 2.11.0.0  && < 2.25
                      , text             >= 1.2.2.2   && < 1.3 || >= 2.0 && < 2.2
-                     , time             >= 1.6.0.1   && < 1.15
+                     , time             >= 1.6.0.1   && < 2
                      , transformers     >= 0.5.2.0   && < 0.7
                      , vector           >= 0.11.0.0  && < 0.14
 
