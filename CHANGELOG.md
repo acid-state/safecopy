@@ -1,3 +1,11 @@
+0.10.4.3
+--------
+
+_Andreas Abel, 2025-08-27_
+
+- Remove old code for GHC 7
+- Tested with GHC 8.0 - 9.14 alpha1
+
 0.10.4
 ======
 
@@ -53,5 +61,3 @@ This change originated as a modification to the way `cereal` 0.5 serializes `Flo
 [https://github.com/GaloisInc/cereal/commit/47d839609413e3e9d1147b99c34ae421ae36bced](https://github.com/GaloisInc/cereal/commit/47d839609413e3e9d1147b99c34ae421ae36bced)
 
 [https://github.com/GaloisInc/cereal/issues/35](https://github.com/GaloisInc/cereal/issues/35)
-
-
