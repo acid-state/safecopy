@@ -1,5 +1,7 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveDataTypeable, FlexibleContexts, UndecidableInstances, TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Data.SafeCopy.Instances where
@@ -171,7 +173,7 @@ instance SafeCopy Natural where
 --
 -- https://github.com/GaloisInc/cereal/commit/47d839609413e3e9d1147b99c34ae421ae36bced
 -- https://github.com/GaloisInc/cereal/issues/35
-newtype CerealFloat040 = CerealFloat040 { unCerealFloat040 :: Float} deriving (Show, Typeable)
+newtype CerealFloat040 = CerealFloat040 { unCerealFloat040 :: Float} deriving (Show)
 instance SafeCopy CerealFloat040 where
     getCopy = contain (CerealFloat040 <$> liftM2 encodeFloat get get)
     putCopy (CerealFloat040 float) = contain (put (decodeFloat float))
@@ -192,7 +194,7 @@ instance SafeCopy Float where
 --
 -- https://github.com/GaloisInc/cereal/commit/47d839609413e3e9d1147b99c34ae421ae36bced
 -- https://github.com/GaloisInc/cereal/issues/35
-newtype CerealDouble040 = CerealDouble040 { unCerealDouble040 :: Double} deriving (Show, Typeable)
+newtype CerealDouble040 = CerealDouble040 { unCerealDouble040 :: Double} deriving (Show)
 instance SafeCopy CerealDouble040 where
     getCopy = contain (CerealDouble040 <$> liftM2 encodeFloat get get)
     putCopy (CerealDouble040 double) = contain (put (decodeFloat double))
